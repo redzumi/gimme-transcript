@@ -1,0 +1,60 @@
+<svg width="1080" height="1080" viewBox="0 0 1080 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sqBg" x1="90" y1="70" x2="950" y2="1010" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFF4E6"/>
+      <stop offset="44%" stop-color="#FFD8AE"/>
+      <stop offset="100%" stop-color="#FB923C"/>
+    </linearGradient>
+    <linearGradient id="sqAccent" x1="124" y1="186" x2="464" y2="526" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FB923C"/>
+      <stop offset="100%" stop-color="#D97706"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1080" height="1080" rx="48" fill="#131313"/>
+  <rect x="26" y="26" width="1028" height="1028" rx="36" fill="url(#sqBg)"/>
+
+  <circle cx="846" cy="212" r="150" fill="#FFFFFF" fill-opacity="0.2"/>
+  <circle cx="930" cy="882" r="184" fill="#7C2D12" fill-opacity="0.08"/>
+
+  <rect x="86" y="90" width="284" height="284" rx="32" fill="#FFFDF8"/>
+  <rect x="112" y="116" width="232" height="232" rx="28" fill="url(#sqAccent)"/>
+  <path d="M152 195C166.667 176.333 181.333 176.333 196 195C210.667 213.667 225.333 213.667 240 195C254.667 176.333 269.333 176.333 284 195" stroke="white" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M308 195H324" stroke="white" stroke-width="16" stroke-linecap="round"/>
+  <path d="M152 248H304" stroke="white" stroke-width="16" stroke-linecap="round"/>
+  <path d="M152 300H266" stroke="white" stroke-width="16" stroke-linecap="round"/>
+
+  <text x="86" y="472" fill="#111111" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="94" font-weight="700" letter-spacing="-2.6">
+    scribe-my-
+  </text>
+  <text x="86" y="568" fill="#111111" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="94" font-weight="700" letter-spacing="-2.6">
+    bitch-up
+  </text>
+
+  <text x="86" y="664" fill="#44403C" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="42" font-weight="500">
+    Local transcription for meetings,
+  </text>
+  <text x="86" y="720" fill="#44403C" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="42" font-weight="500">
+    interviews, and multi-speaker audio.
+  </text>
+
+  <rect x="86" y="786" width="278" height="64" rx="32" fill="#111111"/>
+  <text x="127" y="828" fill="#FFF8EF" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="29" font-weight="700">
+    no cloud
+  </text>
+
+  <rect x="382" y="786" width="278" height="64" rx="32" fill="#111111"/>
+  <text x="422" y="828" fill="#FFF8EF" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="29" font-weight="700">
+    whisper.cpp
+  </text>
+
+  <rect x="678" y="786" width="316" height="64" rx="32" fill="#FFF7ED" stroke="#F59E0B" stroke-width="2"/>
+  <text x="719" y="828" fill="#B45309" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="29" font-weight="700">
+    speaker labeling
+  </text>
+
+  <rect x="86" y="900" width="908" height="96" rx="28" fill="#FFFDF8" fill-opacity="0.78"/>
+  <text x="124" y="958" fill="#57534E" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="34" font-weight="600">
+    Open source desktop app for local transcripts with export to Markdown and TXT
+  </text>
+</svg>

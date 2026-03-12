@@ -1,0 +1,59 @@
+<svg width="1280" height="640" viewBox="0 0 1280 640" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="132" y1="78" x2="1110" y2="620" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFF4E6"/>
+      <stop offset="52%" stop-color="#FFD7A8"/>
+      <stop offset="100%" stop-color="#FFB74D"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="298" y1="100" x2="920" y2="610" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FB923C"/>
+      <stop offset="100%" stop-color="#D97706"/>
+    </linearGradient>
+    <filter id="shadow" x="0" y="0" width="1280" height="640" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="24" stdDeviation="32" flood-color="#6B3410" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+
+  <rect width="1280" height="640" rx="40" fill="#171717"/>
+  <rect x="20" y="20" width="1240" height="600" rx="30" fill="url(#bg)"/>
+
+  <circle cx="1088" cy="136" r="140" fill="#FFFFFF" fill-opacity="0.24"/>
+  <circle cx="1164" cy="516" r="164" fill="#7C2D12" fill-opacity="0.08"/>
+  <circle cx="170" cy="570" r="180" fill="#FFFFFF" fill-opacity="0.18"/>
+
+  <g filter="url(#shadow)">
+    <rect x="66" y="80" width="1148" height="478" rx="32" fill="#FFFDF8"/>
+  </g>
+
+  <rect x="96" y="112" width="382" height="382" rx="36" fill="url(#accent)"/>
+  <path d="M154 229C176 200.333 198 200.333 220 229C242 257.667 264 257.667 286 229C308 200.333 330 200.333 352 229" stroke="white" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M392 229H416H438" stroke="white" stroke-width="24" stroke-linecap="round"/>
+  <path d="M154 304H438" stroke="white" stroke-width="24" stroke-linecap="round"/>
+  <path d="M154 379H354" stroke="white" stroke-width="24" stroke-linecap="round"/>
+
+  <text x="534" y="204" fill="#111111" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="68" font-weight="700" letter-spacing="-1.8">
+    scribe-my-bitch-up
+  </text>
+  <text x="534" y="276" fill="#4B5563" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="30" font-weight="500">
+    Local transcription for multi-speaker audio.
+  </text>
+  <text x="534" y="320" fill="#4B5563" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="30" font-weight="500">
+    No cloud. No API keys. Manual speaker labeling.
+  </text>
+
+  <rect x="534" y="370" width="214" height="52" rx="26" fill="#111111"/>
+  <text x="567" y="403" fill="#FFF8EF" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="24" font-weight="700">
+    whisper.cpp inside
+  </text>
+
+  <rect x="766" y="370" width="164" height="52" rx="26" fill="#FFF1DE" stroke="#F59E0B" stroke-width="2"/>
+  <text x="800" y="403" fill="#B45309" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="24" font-weight="700">
+    macOS-first
+  </text>
+
+  <rect x="534" y="452" width="300" height="14" rx="7" fill="#E5E7EB"/>
+  <rect x="534" y="452" width="194" height="14" rx="7" fill="#FB923C"/>
+  <text x="852" y="464" fill="#6B7280" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="20" font-weight="600">
+    streamed segments • export to md/txt
+  </text>
+</svg>

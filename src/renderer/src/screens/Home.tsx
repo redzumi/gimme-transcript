@@ -53,6 +53,7 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null)
+  const [sessionProgress, setSessionProgress] = useState<Map<string, number>>(new Map())
   const renameInputRef = useRef<HTMLInputElement>(null)
 
   const reload = useCallback(async () => {
@@ -70,6 +71,23 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
 
   useEffect(() => {
     reload()
+
+    const offProgress = window.api.on('whisper:progress', ({ sessionId, percent }) => {
+      setSessionProgress((prev) => new Map(prev).set(sessionId, percent))
+    })
+    const offDone = window.api.on('whisper:done', ({ sessionId }) => {
+      setSessionProgress((prev) => {
+        const next = new Map(prev)
+        next.delete(sessionId)
+        return next
+      })
+      reload()
+    })
+
+    return () => {
+      offProgress()
+      offDone()
+    }
   }, [reload])
 
   useEffect(() => {
@@ -85,6 +103,30 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
     for (const file of files) {
       await window.api.invoke('sessions:create', file, currentModel, 'auto')
     }
+    reload()
+  }
+
+  async function handleImportText(): Promise<void> {
+    const result = await window.api.invoke('dialog:open-text')
+    if (!result) return
+    const { path, content } = result
+    const blocks = content.includes('\n\n')
+      ? content.split(/\n\n+/)
+      : content.split(/\n/)
+    const segments = blocks
+      .map((b) => b.trim())
+      .filter((b) => b.length > 0)
+      .map((b, i) => ({
+        id: `imported-${i}-${Math.random().toString(36).slice(2)}`,
+        start: 0,
+        end: 0,
+        text: b,
+        speakerId: null,
+      }))
+    const firstWords = segments[0]?.text.slice(0, 40) ?? 'Imported text'
+    const name = firstWords.length < (segments[0]?.text.length ?? 0) ? firstWords + '…' : firstWords
+    const session = await window.api.invoke('sessions:create', path, currentModel, 'auto')
+    await window.api.invoke('sessions:update', session.id, { segments, status: 'done', name })
     reload()
   }
 
@@ -204,9 +246,14 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
             <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.06em' }}>
               Sessions
             </Text>
-            <Button size="xs" variant="subtle" color="orange" onClick={handleNewSession}>
-              + New
-            </Button>
+            <Group gap={4}>
+              <Button size="xs" variant="subtle" color="gray" onClick={handleImportText}>
+                Import text
+              </Button>
+              <Button size="xs" variant="subtle" color="orange" onClick={handleNewSession}>
+                + New
+              </Button>
+            </Group>
           </div>
 
           {/* Search */}
@@ -271,6 +318,11 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
                         <p className="m-0 mt-0.5 flex items-center gap-1.5">
                           <span className={`inline-block w-1.5 h-1.5 rounded-full ${STATUS_DOT[key]}`} />
                           <span className="text-xs text-gray-500">{STATUS_LABEL[key]}</span>
+                          {key === 'transcribing' && sessionProgress.has(s.id) && (
+                            <span className="text-xs text-blue-400 font-medium">
+                              {Math.round(sessionProgress.get(s.id)!)}%
+                            </span>
+                          )}
                           <span className="text-gray-300 text-xs">·</span>
                           <span className="text-xs text-gray-400">{formatAgo(s.createdAt)}</span>
                         </p>
