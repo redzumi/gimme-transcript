@@ -10,8 +10,8 @@ body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background: #fff;
-  color: #111;
+  background: var(--app-shell);
+  color: var(--color-text);
 }
 
 #root {

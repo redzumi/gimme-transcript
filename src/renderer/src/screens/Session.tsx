@@ -17,7 +17,7 @@ function formatTime(seconds: number): string {
 const SPEAKER_COLORS = [
   { pill: 'bg-blue-100 text-blue-700', bar: 'bg-blue-50 border-l-2 border-blue-300' },
   { pill: 'bg-emerald-100 text-emerald-700', bar: 'bg-emerald-50 border-l-2 border-emerald-300' },
-  { pill: 'bg-orange-100 text-orange-700', bar: 'bg-orange-50 border-l-2 border-orange-300' },
+  { pill: 'bg-[#ffe3dc] text-[#d4375b]', bar: 'bg-[#fff5f1] border-l-2 border-[#ff7e77]' },
   { pill: 'bg-violet-100 text-violet-700', bar: 'bg-violet-50 border-l-2 border-violet-300' },
   { pill: 'bg-pink-100 text-pink-700', bar: 'bg-pink-50 border-l-2 border-pink-300' },
   { pill: 'bg-amber-100 text-amber-700', bar: 'bg-amber-50 border-l-2 border-amber-300' },
@@ -298,14 +298,14 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
     await window.api.invoke('whisper:transcribe', sessionId)
   }
 
-  if (!session) return <div className="h-screen bg-white" />
+  if (!session) return <div className="h-screen bg-[var(--app-shell)]" />
 
   const sessionName = session.name ?? session.audioFile.split('/').pop() ?? session.audioFile
   const showTranscript = session.status === 'transcribing' || session.status === 'done'
 
   return (
     <div
-      className="flex flex-col h-screen bg-white"
+      className="flex h-screen flex-col bg-[var(--app-shell)]"
       onClick={(e) => {
         if (didDragRef.current) {
           didDragRef.current = false
@@ -331,21 +331,21 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
         <>
           <div className="fixed inset-0 z-40" onClick={() => setSegCtxMenu(null)} />
           <div
-            className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[180px]"
+            className="fixed z-50 min-w-[180px] rounded-xl border border-[#edd8ce] bg-white/95 py-1 shadow-[0_18px_48px_rgba(77,42,66,0.14)] backdrop-blur-sm"
             style={{ top: segCtxMenu.y, left: segCtxMenu.x }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-3 py-1 text-[10px] text-gray-400 uppercase tracking-wider font-medium">
+            <div className="px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-[#8f7982]">
               {selectedIds.size} segment{selectedIds.size > 1 ? 's' : ''}
             </div>
-            <div className="border-t border-gray-100 my-1" />
+            <div className="my-1 border-t border-[#f3e5dd]" />
             {speakers.map((sp) => {
               const colorIdx = speakerColorMap.get(sp.id) ?? 0
               const colors = SPEAKER_COLORS[colorIdx % SPEAKER_COLORS.length]
               return (
                 <button
                   key={sp.id}
-                  className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[#5b4653] transition-colors hover:bg-[#fff4ee]"
                   onClick={() => {
                     handleAssignSelected(sp.id)
                     setSegCtxMenu(null)
@@ -360,7 +360,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
               )
             })}
             <button
-              className="w-full text-left px-3 py-1.5 text-sm text-gray-400 hover:bg-gray-50 transition-colors"
+              className="w-full px-3 py-1.5 text-left text-sm text-[#8f7982] transition-colors hover:bg-[#fff4ee]"
               onClick={() => {
                 handleAssignSelected('__none__')
                 setSegCtxMenu(null)
@@ -370,9 +370,9 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
             </button>
             {selectedIds.size >= 2 && (
               <>
-                <div className="border-t border-gray-100 my-1" />
+                <div className="my-1 border-t border-[#f3e5dd]" />
                 <button
-                  className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="w-full px-3 py-1.5 text-left text-sm text-[#5b4653] transition-colors hover:bg-[#fff4ee]"
                   onClick={handleMergeSelected}
                 >
                   Merge {selectedIds.size} segments
@@ -388,29 +388,29 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
           <Text size="sm" fw={500}>
             Converting audio for playback…
           </Text>
-          <Progress value={convertProgress} animated size="sm" color="orange" />
+          <Progress value={convertProgress} animated size="sm" color="sunset" />
           <Text size="xs" c="dimmed" ta="right">
             {Math.round(convertProgress)}%
           </Text>
         </div>
       </Modal>
 
-      <div className="flex items-center gap-2 px-4 h-11 border-b border-gray-200 shrink-0">
+      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-[#ead7cf] bg-white/70 px-4 backdrop-blur-sm">
         <button
-          className="text-xs text-gray-400 hover:text-gray-800 transition-colors px-1.5 py-1 rounded hover:bg-gray-100"
+          className="rounded px-1.5 py-1 text-xs text-[#8f7982] transition-colors hover:bg-[#fff2eb] hover:text-[#24191f]"
           onClick={onBack}
         >
           ← Home
         </button>
         <div className="w-px h-3.5 bg-gray-200" />
-        <span className="text-sm text-gray-700 font-medium truncate flex-1">{sessionName}</span>
+        <span className="flex-1 truncate text-sm font-medium text-[#5b4653]">{sessionName}</span>
         {session.status === 'done' && (
           <Group gap="xs">
             <ExportButton session={session} speakers={speakers} />
             <Button
               size="xs"
               variant="subtle"
-              color="gray"
+              color="lilac"
               onClick={(e) => {
                 e.stopPropagation()
                 setMergeOpen(true)
@@ -423,7 +423,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
       </div>
 
       {session.status === 'transcribing' && (
-        <div className="px-4 py-2 border-b border-gray-100 shrink-0">
+        <div className="shrink-0 border-b border-[#f3e5dd] bg-white/70 px-4 py-2">
           <div className="flex items-center justify-between mb-1.5">
             <Text size="xs" c="dimmed">
               Transcribing… {Math.round(progress)}%
@@ -438,17 +438,17 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
               Cancel
             </button>
           </div>
-          <Progress value={progress} animated size="xs" color="orange" />
+          <Progress value={progress} animated size="xs" color="sunset" />
         </div>
       )}
 
       {session.status === 'idle' && (
         <div className="flex flex-col items-center justify-center flex-1 gap-8">
           <div className="text-center">
-            <p className="text-xs text-gray-400 uppercase tracking-widest font-medium mb-2">
+            <p className="mb-2 text-xs font-medium uppercase tracking-widest text-[#8f7982]">
               Ready to transcribe
             </p>
-            <p className="text-base font-semibold text-gray-800">{sessionName}</p>
+            <p className="text-base font-semibold text-[#24191f]">{sessionName}</p>
           </div>
           {downloadedModels.length === 0 ? (
             <p className="text-xs text-amber-600 text-center max-w-xs">
@@ -494,7 +494,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
             </div>
           )}
           <Button
-            color="orange"
+            color="sunset"
             disabled={downloadedModels.length === 0}
             onClick={handleTranscribe}
           >
@@ -570,8 +570,8 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
                           ? 'bg-white px-10'
                           : `cursor-pointer select-none ${
                               isSelected
-                                ? 'bg-orange-100 pl-[calc(2.5rem-3px)] pr-10 border-l-[3px] border-orange-400'
-                                : 'px-10 hover:bg-gray-50'
+                                ? 'bg-[#ffe8e1] pl-[calc(2.5rem-3px)] pr-10 border-l-[3px] border-[#ff7e77]'
+                                : 'px-10 hover:bg-[#fff6f0]'
                             }`
                       }`}
                       onContextMenu={(e) => {
@@ -615,17 +615,17 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
                             {speaker.name}
                           </span>
                         ) : (
-                          <span className="text-[11px] text-gray-300 font-medium">—</span>
+                          <span className="text-[11px] font-medium text-[#ccb8c1]">—</span>
                         )}
-                        <span className="text-[10px] font-mono text-gray-300">
+                        <span className="text-[10px] font-mono text-[#ccb8c1]">
                           {formatTime(seg.start)}
                         </span>
                         {hasAudio && seg.end > seg.start && (
                           <button
                             className={`text-[11px] leading-none transition-colors mt-0.5 ${
                               playingId === seg.id
-                                ? 'text-orange-500'
-                                : 'text-gray-300 hover:text-orange-400'
+                                ? 'text-[#ff4d6d]'
+                                : 'text-[#ccb8c1] hover:text-[#ff7a18]'
                             }`}
                             title={playingId === seg.id ? 'Pause' : 'Play segment'}
                             onClick={(e) => {
@@ -641,7 +641,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
                       {isEditing ? (
                         <textarea
                           ref={editRef}
-                          className="flex-1 text-sm text-gray-800 leading-relaxed resize-none outline-none border border-orange-300 rounded px-2 py-0.5 bg-orange-50 focus:bg-white transition-colors"
+                          className="flex-1 resize-none rounded border border-[#ffb7a1] bg-[#fff4ee] px-2 py-0.5 text-sm leading-relaxed text-[#24191f] outline-none transition-colors focus:bg-white"
                           value={editValue}
                           rows={Math.max(2, editValue.split('\n').length)}
                           onChange={(e) => setEditValue(e.target.value)}
@@ -660,7 +660,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
                         />
                       ) : (
                         <p
-                          className="flex-1 text-sm text-gray-800 leading-relaxed m-0"
+                          className="m-0 flex-1 text-sm leading-relaxed text-[#24191f]"
                           onDoubleClick={(e) => {
                             e.stopPropagation()
                             handleEditStart(seg)
@@ -676,8 +676,8 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
             </div>
           )}
           {session.status === 'transcribing' && session.segments.length > 0 && (
-            <div className="px-10 py-2 pl-[8.5rem] shrink-0 border-t border-gray-50">
-              <span className="inline-block w-0.5 h-4 bg-orange-400 animate-pulse rounded" />
+            <div className="shrink-0 border-t border-[#f6ebe5] px-10 py-2 pl-[8.5rem]">
+              <span className="inline-block h-4 w-0.5 rounded bg-[#ff7a18] animate-pulse" />
             </div>
           )}
         </>
@@ -708,7 +708,7 @@ function PasteArea({ onSubmit }: { onSubmit: (text: string) => Promise<void> }):
   return (
     <div className="flex flex-col h-full px-10 py-8 gap-4" onClick={(e) => e.stopPropagation()}>
       <textarea
-        className="flex-1 min-h-[300px] w-full text-sm text-gray-800 leading-relaxed resize-none outline-none border border-gray-200 rounded-lg p-4 placeholder-gray-300 focus:border-orange-300 transition-colors"
+        className="min-h-[300px] w-full flex-1 resize-none rounded-xl border border-[#edd8ce] bg-white/80 p-4 text-sm leading-relaxed text-[#24191f] outline-none transition-colors placeholder:text-[#ccb8c1] focus:border-[#ffb7a1]"
         placeholder="Paste your text here…&#10;&#10;Each paragraph will become a separate segment."
         value={value}
         onChange={(e) => setValue(e.target.value)}
@@ -716,7 +716,7 @@ function PasteArea({ onSubmit }: { onSubmit: (text: string) => Promise<void> }):
       />
       <div className="flex justify-end">
         <Button
-          color="orange"
+          color="sunset"
           size="sm"
           disabled={!value.trim() || loading}
           loading={loading}
@@ -775,19 +775,19 @@ function ExportButton({ session, speakers }: ExportButtonProps): React.JSX.Eleme
 
   return (
     <div className="relative" onClick={(e) => e.stopPropagation()}>
-      <Button size="xs" variant="light" color="orange" onClick={() => setOpen((o) => !o)}>
+      <Button size="xs" variant="light" color="sunset" onClick={() => setOpen((o) => !o)}>
         Export ▾
       </Button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10 min-w-[140px]">
+        <div className="absolute right-0 top-full z-10 mt-1 min-w-[140px] rounded-xl border border-[#edd8ce] bg-white/95 py-1 shadow-[0_18px_48px_rgba(77,42,66,0.14)] backdrop-blur-sm">
           <button
-            className="w-full text-left text-xs px-3 py-2 hover:bg-gray-50 text-gray-700 transition-colors"
+            className="w-full px-3 py-2 text-left text-xs text-[#5b4653] transition-colors hover:bg-[#fff4ee]"
             onClick={() => handleExport('md')}
           >
             Markdown (.md)
           </button>
           <button
-            className="w-full text-left text-xs px-3 py-2 hover:bg-gray-50 text-gray-700 transition-colors"
+            className="w-full px-3 py-2 text-left text-xs text-[#5b4653] transition-colors hover:bg-[#fff4ee]"
             onClick={() => handleExport('txt')}
           >
             Plain text (.txt)
@@ -888,7 +888,7 @@ function MergeExportModal({
           <Button
             size="sm"
             variant="light"
-            color="orange"
+            color="sunset"
             disabled={checkedIds.size === 0}
             onClick={() => handleExport('md')}
           >
@@ -897,7 +897,7 @@ function MergeExportModal({
           <Button
             size="sm"
             variant="light"
-            color="orange"
+            color="sunset"
             disabled={checkedIds.size === 0}
             onClick={() => handleExport('txt')}
           >

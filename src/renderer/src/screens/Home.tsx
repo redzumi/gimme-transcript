@@ -26,9 +26,9 @@ function formatAgo(iso: string): string {
 
 const STATUS_DOT: Record<string, string> = {
   idle: 'bg-gray-300',
-  transcribing: 'bg-blue-400',
+  transcribing: 'bg-[#ffb33d]',
   done: 'bg-emerald-400',
-  labeled: 'bg-violet-400'
+  labeled: 'bg-[#a05dff]'
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -64,10 +64,14 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
       window.api.invoke('settings:get'),
       window.api.invoke('models:list')
     ])
+    const availableModels = modelList.filter((m) => m.downloaded).map((m) => m.model)
+    const resolvedModel = availableModels.includes(settings.defaultModel)
+      ? settings.defaultModel
+      : (availableModels[0] ?? settings.defaultModel)
     setSessions(s)
     setSpeakers(sp)
-    setCurrentModel(settings.defaultModel)
-    setDownloadedModels(modelList.filter((m) => m.downloaded).map((m) => m.model))
+    setCurrentModel(resolvedModel)
+    setDownloadedModels(availableModels)
   }, [])
 
   useEffect(() => {
@@ -204,7 +208,7 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
 
   return (
     <div
-      className="flex flex-col h-screen bg-white"
+      className="flex h-screen flex-col bg-[var(--app-shell)]"
       onClick={() => {
         closeContextMenu()
         setNewMenuOpen(false)
@@ -216,17 +220,17 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
           if (!session) return null
           return (
             <div
-              className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[140px]"
+              className="fixed z-50 min-w-[140px] rounded-xl border border-[#edd8ce] bg-white/95 py-1 shadow-[0_18px_48px_rgba(77,42,66,0.14)] backdrop-blur-sm"
               style={{ top: contextMenu.y, left: contextMenu.x }}
               onClick={(e) => e.stopPropagation()}
             >
               <button
-                className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#5b4653] transition-colors hover:bg-[#fff4ee]"
                 onClick={(e) => handleStartRename(e, session)}
               >
                 <span className="text-base">✎</span> Rename
               </button>
-              <div className="border-t border-gray-100 my-1" />
+              <div className="my-1 border-t border-[#f3e5dd]" />
               <button
                 className="w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors flex items-center gap-2"
                 onClick={(e) => {
@@ -240,7 +244,7 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
           )
         })()}
 
-      <div className="flex items-center justify-between px-5 h-11 border-b border-gray-200 shrink-0">
+      <div className="flex h-12 shrink-0 items-center justify-between border-b border-[#ead7cf] bg-white/70 px-5 backdrop-blur-sm">
         <div className="flex items-center">
           <Logo size={28} />
         </div>
@@ -257,7 +261,7 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
           <ActionIcon
             variant="subtle"
             size="sm"
-            color="gray"
+            color="lilac"
             onClick={onOpenSettings}
             title="Settings"
           >
@@ -267,8 +271,8 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        <div className="flex flex-col flex-1 min-w-0 border-r border-gray-200">
-          <div className="flex items-center justify-between px-5 py-2.5 border-b border-gray-100">
+        <div className="flex min-w-0 flex-1 flex-col border-r border-[#ead7cf] bg-white/72 backdrop-blur-sm">
+          <div className="flex items-center justify-between border-b border-[#f3e5dd] px-5 py-2.5">
             <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.06em' }}>
               Sessions
             </Text>
@@ -276,28 +280,28 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
               <Button
                 size="xs"
                 variant="subtle"
-                color="orange"
+                color="sunset"
                 onClick={() => setNewMenuOpen((o) => !o)}
               >
                 + New ▾
               </Button>
               {newMenuOpen && (
-                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[160px]">
+                <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] rounded-xl border border-[#edd8ce] bg-white/95 py-1 shadow-[0_18px_48px_rgba(77,42,66,0.14)] backdrop-blur-sm">
                   <button
-                    className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    className="w-full px-3 py-2 text-left text-sm text-[#5b4653] transition-colors hover:bg-[#fff4ee]"
                     onClick={handleNewSession}
                   >
                     Import audio
                   </button>
                   <button
-                    className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    className="w-full px-3 py-2 text-left text-sm text-[#5b4653] transition-colors hover:bg-[#fff4ee]"
                     onClick={handleImportText}
                   >
                     Import text
                   </button>
-                  <div className="border-t border-gray-100 my-1" />
+                  <div className="my-1 border-t border-[#f3e5dd]" />
                   <button
-                    className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    className="w-full px-3 py-2 text-left text-sm text-[#5b4653] transition-colors hover:bg-[#fff4ee]"
                     onClick={handleEmptySession}
                   >
                     Empty session
@@ -307,13 +311,13 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
             </div>
           </div>
 
-          <div className="px-5 py-2 border-b border-gray-100">
+          <div className="border-b border-[#f3e5dd] px-5 py-2">
             <TextInput
               size="xs"
               placeholder="Search sessions…"
               value={search}
               onChange={(e) => setSearch(e.currentTarget.value)}
-              styles={{ input: { backgroundColor: '#f9f9f9' } }}
+              styles={{ input: { backgroundColor: '#fff8f3', borderColor: '#edd8ce' } }}
             />
           </div>
 
@@ -348,7 +352,7 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
                   return (
                     <div
                       key={s.id}
-                      className="flex items-center gap-3 px-5 py-3 cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-50 group"
+                      className="group flex cursor-pointer items-center gap-3 border-b border-[#f6ebe5] px-5 py-3 transition-colors hover:bg-[#fff6f0]"
                       onClick={() => !isRenaming && onOpenSession(s.id)}
                       onContextMenu={(e) => handleContextMenu(e, s.id)}
                     >
@@ -356,7 +360,7 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
                         {isRenaming ? (
                           <input
                             ref={renameInputRef}
-                            className="text-sm font-medium text-gray-900 w-full border border-orange-300 rounded px-1 outline-none"
+                            className="w-full rounded border border-[#ffb7a1] px-1 text-sm font-medium text-[#24191f] outline-none"
                             value={renameValue}
                             onChange={(e) => setRenameValue(e.currentTarget.value)}
                             onKeyDown={(e) => {
@@ -367,7 +371,7 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
                             onClick={(e) => e.stopPropagation()}
                           />
                         ) : (
-                          <p className="text-sm font-medium text-gray-900 truncate m-0">
+                          <p className="m-0 truncate text-sm font-medium text-[#24191f]">
                             {getSessionName(s)}
                           </p>
                         )}
@@ -375,18 +379,18 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
                           <span
                             className={`inline-block w-1.5 h-1.5 rounded-full ${STATUS_DOT[key]}`}
                           />
-                          <span className="text-xs text-gray-500">{STATUS_LABEL[key]}</span>
+                          <span className="text-xs text-[#7f6671]">{STATUS_LABEL[key]}</span>
                           {key === 'transcribing' && sessionProgress.has(s.id) && (
-                            <span className="text-xs text-blue-400 font-medium">
+                            <span className="text-xs font-medium text-[#ff8a3d]">
                               {Math.round(sessionProgress.get(s.id) ?? 0)}%
                             </span>
                           )}
-                          <span className="text-gray-300 text-xs">·</span>
-                          <span className="text-xs text-gray-400">{formatAgo(s.createdAt)}</span>
+                          <span className="text-xs text-[#ccb8c1]">·</span>
+                          <span className="text-xs text-[#8f7982]">{formatAgo(s.createdAt)}</span>
                         </p>
                       </div>
 
-                      <span className="text-gray-300 text-sm shrink-0">›</span>
+                      <span className="shrink-0 text-sm text-[#ccb8c1]">›</span>
                     </div>
                   )
                 })}
@@ -395,15 +399,15 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
           </ScrollArea>
         </div>
 
-        <div className="flex flex-col w-52 shrink-0">
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
+        <div className="flex w-52 shrink-0 flex-col bg-[#fffdfb]/78 backdrop-blur-sm">
+          <div className="flex items-center justify-between border-b border-[#f3e5dd] px-4 py-2.5">
             <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.06em' }}>
               Speakers
             </Text>
             <Button
               size="xs"
               variant="subtle"
-              color="orange"
+              color="sunset"
               onClick={() => setAddingSpeaker(true)}
             >
               + Add
@@ -412,7 +416,7 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
 
           <ScrollArea className="flex-1 px-3 py-2">
             {addingSpeaker && (
-              <div className="mb-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="mb-2 rounded-xl border border-[#edd8ce] bg-[#fff8f3] p-2">
                 <TextInput
                   size="xs"
                   placeholder="Speaker name"
@@ -425,14 +429,14 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
                   autoFocus
                 />
                 <Group gap="xs" mt="xs">
-                  <Button size="xs" flex={1} color="orange" onClick={handleAddSpeaker}>
+                  <Button size="xs" flex={1} color="sunset" onClick={handleAddSpeaker}>
                     Add
                   </Button>
                   <Button
                     size="xs"
                     flex={1}
                     variant="subtle"
-                    color="gray"
+                    color="lilac"
                     onClick={() => setAddingSpeaker(false)}
                   >
                     Cancel
@@ -449,7 +453,7 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
                 {speakers.map((sp) => (
                   <div
                     key={sp.id}
-                    className="flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-gray-50 group transition-colors"
+                    className="group flex items-center justify-between rounded-md px-2 py-1.5 transition-colors hover:bg-[#fff4ee]"
                   >
                     <Text size="sm" c="gray.8">
                       {sp.name}

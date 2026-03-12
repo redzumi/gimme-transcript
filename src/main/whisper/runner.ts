@@ -9,7 +9,7 @@ import { BrowserWindow } from 'electron'
 import { getWhisperBinaryPath } from './binary'
 import { prepareAudio } from './convert'
 import { parseSegmentLine, parseProgressLine } from './parser'
-import { modelPath } from '../ipc/models'
+import { modelPath, resolveDownloadedModel } from '../ipc/models'
 import { getSession, updateSession } from '../storage'
 import { getSessionPath } from '../storage/paths'
 
@@ -31,15 +31,16 @@ export async function transcribeSession(sessionId: string): Promise<void> {
     throw new Error(`whisper.cpp binary not found at ${binaryPath}.\nRun: npm run whisper:setup`)
   }
 
-  const mPath = modelPath(session.model)
-  if (!existsSync(mPath)) {
+  const actualModel = resolveDownloadedModel(session.model)
+  if (!actualModel) {
     throw new Error(`Model "${session.model}" is not downloaded`)
   }
+  const mPath = modelPath(actualModel)
 
   // Convert audio if needed (async, non-blocking)
   const { audioPath, tempFile } = await prepareAudio(session.audioFile)
 
-  updateSession(sessionId, { status: 'transcribing', segments: [] })
+  updateSession(sessionId, { status: 'transcribing', segments: [], model: actualModel })
 
   const threadCount = String(Math.max(1, Math.floor(cpus().length / 2)))
   const lang = session.language === 'auto' ? 'auto' : session.language
@@ -50,7 +51,12 @@ export async function transcribeSession(sessionId: string): Promise<void> {
     activeProcesses.set(sessionId, proc)
 
     // In-memory session copy — updated cheaply without disk reads
-    const liveSession: typeof session = { ...session, status: 'transcribing', segments: [] }
+    const liveSession: typeof session = {
+      ...session,
+      model: actualModel,
+      status: 'transcribing',
+      segments: []
+    }
     const sessionFilePath = getSessionPath(sessionId)
     let stdoutBuf = ''
     let segmentsSinceFlush = 0
@@ -94,7 +100,11 @@ export async function transcribeSession(sessionId: string): Promise<void> {
       const wasCancelled = cancelledSessions.delete(sessionId)
 
       if (tempFile) {
-        try { unlinkSync(audioPath) } catch { /* ignore */ }
+        try {
+          unlinkSync(audioPath)
+        } catch {
+          /* ignore */
+        }
       }
 
       if (wasCancelled) {
@@ -131,7 +141,11 @@ export async function transcribeSession(sessionId: string): Promise<void> {
       activeProcesses.delete(sessionId)
       cancelledSessions.delete(sessionId)
       if (tempFile) {
-        try { unlinkSync(audioPath) } catch { /* ignore */ }
+        try {
+          unlinkSync(audioPath)
+        } catch {
+          /* ignore */
+        }
       }
       liveSession.status = 'idle'
       writeFileSync(sessionFilePath, JSON.stringify(liveSession, null, 2), 'utf8')

@@ -21,7 +21,7 @@ export default function App(): React.JSX.Element {
     })
   }, [])
 
-  if (!screen) return <div className="h-screen bg-white" />
+  if (!screen) return <div style={{ height: '100vh', background: 'var(--app-shell)' }} />
 
   if (screen.name === 'firstLaunch') {
     return <FirstLaunch onDone={() => setScreen({ name: 'home' })} />
@@ -37,12 +37,7 @@ export default function App(): React.JSX.Element {
   }
 
   if (screen.name === 'session') {
-    return (
-      <Session
-        sessionId={screen.id}
-        onBack={() => setScreen({ name: 'home' })}
-      />
-    )
+    return <Session sessionId={screen.id} onBack={() => setScreen({ name: 'home' })} />
   }
 
   if (screen.name === 'settings') {

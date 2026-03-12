@@ -25,6 +25,8 @@ const MODEL_URLS: Record<WhisperModel, string> = {
   large: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin'
 }
 
+const MODEL_ORDER: WhisperModel[] = ['tiny', 'base', 'small', 'medium', 'large']
+
 export function modelFileName(model: WhisperModel): string {
   return `ggml-${model}.bin`
 }
@@ -35,6 +37,15 @@ export function modelPath(model: WhisperModel): string {
 
 export function isModelDownloaded(model: WhisperModel): boolean {
   return existsSync(modelPath(model))
+}
+
+export function getDownloadedModels(): WhisperModel[] {
+  return MODEL_ORDER.filter(isModelDownloaded)
+}
+
+export function resolveDownloadedModel(preferred: WhisperModel): WhisperModel | null {
+  if (isModelDownloaded(preferred)) return preferred
+  return getDownloadedModels()[0] ?? null
 }
 
 // ---------------------------------------------------------------------------
@@ -178,8 +189,7 @@ function downloadModel(model: WhisperModel): Promise<void> {
 export function registerModelHandlers(): void {
   ipcMain.handle('models:list', (): ModelInfo[] => {
     if (modelsCache) return modelsCache
-    const models: WhisperModel[] = ['tiny', 'base', 'small', 'medium', 'large']
-    modelsCache = models.map((model) => ({
+    modelsCache = MODEL_ORDER.map((model) => ({
       model,
       sizeBytes: MODEL_SIZES[model],
       downloaded: isModelDownloaded(model)
