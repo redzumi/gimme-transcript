@@ -6,7 +6,7 @@ interface LogoProps {
 }
 
 export function Logo({ size = 28, className = '' }: LogoProps): React.JSX.Element {
-  const width = Math.round(size * 2.6)
+  const width = Math.round(size * 3)
 
   return (
     <img

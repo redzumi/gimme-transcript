@@ -4,5 +4,5 @@ Cleanup complete. Older explorations were removed after selecting the final dire
 
 Current files:
 
-- `logo.svg` — current chosen final SVG mark
+- `logo.svg` — current chosen final SVG wordmark
 - `logo.png` — raster export / preview companion
