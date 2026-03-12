@@ -194,7 +194,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
               Cancel
             </button>
           </div>
-          <Progress value={progress} animated size="xs" color="indigo" />
+          <Progress value={progress} animated size="xs" color="orange" />
         </div>
       )}
 
@@ -248,7 +248,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
               />
             </div>
           )}
-          <Button color="indigo" disabled={downloadedModels.length === 0} onClick={handleTranscribe}>
+          <Button color="orange" disabled={downloadedModels.length === 0} onClick={handleTranscribe}>
             Transcribe
           </Button>
           {error && (
@@ -280,7 +280,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
                   key={seg.id}
                   data-segment
                   className={`flex gap-0 px-10 py-2 cursor-pointer select-none transition-colors ${
-                    isSelected ? 'bg-indigo-50' : 'hover:bg-gray-50'
+                    isSelected ? 'bg-orange-50' : 'hover:bg-gray-50'
                   }`}
                   onClick={(e) => {
                     e.stopPropagation()
@@ -313,7 +313,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
 
             {session.status === 'transcribing' && session.segments.length > 0 && (
               <div className="px-10 py-2 flex justify-end pr-[calc(100%-8rem+1rem)] pl-[8.5rem]">
-                <span className="inline-block w-0.5 h-4 bg-indigo-400 animate-pulse rounded" />
+                <span className="inline-block w-0.5 h-4 bg-orange-400 animate-pulse rounded" />
               </div>
             )}
           </div>
@@ -374,14 +374,14 @@ function AssignBar({ count, speakers, onAssign, onCreateAndAssign, onClear }: As
         {speakers.map((sp) => (
           <button
             key={sp.id}
-            className="text-xs px-3 py-1 bg-gray-100 hover:bg-indigo-100 hover:text-indigo-700 text-gray-700 rounded-full transition-colors font-medium whitespace-nowrap"
+            className="text-xs px-3 py-1 bg-gray-100 hover:bg-orange-100 hover:text-orange-700 text-gray-700 rounded-full transition-colors font-medium whitespace-nowrap"
             onClick={() => onAssign(sp.id)}
           >
             {sp.name}
           </button>
         ))}
         <input
-          className="text-xs px-3 py-1 bg-gray-100 rounded-full outline-none placeholder-gray-400 text-gray-700 min-w-0 w-32 focus:bg-indigo-50 focus:placeholder-indigo-300 transition-colors"
+          className="text-xs px-3 py-1 bg-gray-100 rounded-full outline-none placeholder-gray-400 text-gray-700 min-w-0 w-32 focus:bg-orange-50 focus:placeholder-orange-300 transition-colors"
           placeholder="+ new speaker"
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
@@ -441,7 +441,7 @@ function ExportButton({ session, speakers }: ExportButtonProps): React.JSX.Eleme
 
   return (
     <div className="relative" onClick={(e) => e.stopPropagation()}>
-      <Button size="xs" variant="light" color="indigo" onClick={() => setOpen((o) => !o)}>
+      <Button size="xs" variant="light" color="orange" onClick={() => setOpen((o) => !o)}>
         Export ▾
       </Button>
       {open && (
@@ -556,7 +556,7 @@ function MergeExportModal({
           <Button
             size="sm"
             variant="light"
-            color="indigo"
+            color="orange"
             disabled={checkedIds.size === 0}
             onClick={() => handleExport('md')}
           >
@@ -565,7 +565,7 @@ function MergeExportModal({
           <Button
             size="sm"
             variant="light"
-            color="indigo"
+            color="orange"
             disabled={checkedIds.size === 0}
             onClick={() => handleExport('txt')}
           >

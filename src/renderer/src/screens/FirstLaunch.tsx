@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Button, Stack, Progress, Group, Badge } from '@mantine/core'
 import type { WhisperModel, ModelInfo } from '../types/ipc'
+import { Logo } from '../components/Logo'
 
 function formatSpeed(bps: number): string {
   if (bps >= 1024 * 1024) return `${(bps / 1024 / 1024).toFixed(1)} MB/s`
@@ -71,7 +72,12 @@ export default function FirstLaunch({ onDone }: Props): React.JSX.Element {
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
         <Stack gap="xl">
           <div>
-            <h1 className="text-lg font-semibold text-gray-900 mb-1">scribe</h1>
+            <div className="flex items-center gap-2.5 mb-3">
+              <Logo size={32} />
+              <h1 className="text-base font-semibold text-gray-900 tracking-tight">
+                scribe-my-bitch-up
+              </h1>
+            </div>
             <p className="text-sm text-gray-500 leading-relaxed">
               To get started, download a Whisper model.
               <br />
@@ -89,7 +95,7 @@ export default function FirstLaunch({ onDone }: Props): React.JSX.Element {
                   key={m}
                   className={`w-full text-left px-4 py-3 rounded-xl border transition-all ${
                     isSelected
-                      ? 'border-indigo-300 bg-indigo-50'
+                      ? 'border-orange-300 bg-orange-50'
                       : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                   }`}
                   onClick={() => setSelected(m)}
@@ -98,11 +104,11 @@ export default function FirstLaunch({ onDone }: Props): React.JSX.Element {
                     <div className="flex items-center gap-3">
                       <div
                         className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${
-                          isSelected ? 'border-indigo-500' : 'border-gray-300'
+                          isSelected ? 'border-orange-500' : 'border-gray-300'
                         }`}
                       >
                         {isSelected && (
-                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                          <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
                         )}
                       </div>
                       <div>
@@ -118,7 +124,7 @@ export default function FirstLaunch({ onDone }: Props): React.JSX.Element {
                         </Badge>
                       )}
                       {m === 'medium' && !isDownloaded && (
-                        <Badge size="xs" color="indigo" variant="light">
+                        <Badge size="xs" color="orange" variant="light">
                           recommended
                         </Badge>
                       )}
@@ -132,7 +138,7 @@ export default function FirstLaunch({ onDone }: Props): React.JSX.Element {
           {/* Progress */}
           {downloading && (
             <Stack gap="xs">
-              <Progress value={progress} animated size="sm" color="indigo" radius="xl" />
+              <Progress value={progress} animated size="sm" color="orange" radius="xl" />
               <Group justify="space-between">
                 <span className="text-xs text-gray-400">
                   {Math.round(progress)}%
@@ -149,12 +155,12 @@ export default function FirstLaunch({ onDone }: Props): React.JSX.Element {
 
           {/* Action */}
           {selectedDownloaded ? (
-            <Button color="indigo" size="md" radius="xl" onClick={onDone}>
+            <Button color="orange" size="md" radius="xl" onClick={onDone}>
               Get started
             </Button>
           ) : (
             <Button
-              color="indigo"
+              color="orange"
               size="md"
               radius="xl"
               onClick={handleDownload}

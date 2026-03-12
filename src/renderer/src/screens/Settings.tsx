@@ -190,7 +190,7 @@ export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
                             <span className="text-sm font-medium text-gray-900">{m}</span>
                             <span className="text-xs text-gray-400">{MODEL_META[m].size}</span>
                             {isDefault && isDownloaded && (
-                              <span className="text-[10px] font-semibold uppercase tracking-wide text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-full">
+                              <span className="text-[10px] font-semibold uppercase tracking-wide text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-full">
                                 default
                               </span>
                             )}
@@ -221,7 +221,7 @@ export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
                               <Button
                                 size="xs"
                                 variant="subtle"
-                                color="indigo"
+                                color="orange"
                                 onClick={() => handleUpdate({ defaultModel: m })}
                               >
                                 Set default
@@ -240,7 +240,7 @@ export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
                           <Button
                             size="xs"
                             variant="light"
-                            color="indigo"
+                            color="orange"
                             disabled={isAnyDownloading}
                             onClick={() => handleDownload(m)}
                           >
@@ -256,7 +256,7 @@ export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
                         <Progress
                           value={dl.percent}
                           size="xs"
-                          color="indigo"
+                          color="orange"
                           animated={dl.percent < 100}
                           radius="xl"
                         />

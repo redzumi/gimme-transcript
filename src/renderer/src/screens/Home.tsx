@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Text, Button, Group, ActionIcon, TextInput, Select, ScrollArea } from '@mantine/core'
 import type { Session, Speaker, WhisperModel } from '../types/ipc'
+import { Logo } from '../components/Logo'
 
 interface Props {
   onOpenSession: (id: string) => void
@@ -89,7 +90,10 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
     <div className="flex flex-col h-screen bg-white">
       {/* Header */}
       <div className="flex items-center justify-between px-5 h-11 border-b border-gray-200 shrink-0">
-        <span className="text-sm font-semibold text-gray-900 tracking-tight">scribe</span>
+        <div className="flex items-center gap-2">
+          <Logo size={22} />
+          <span className="text-sm font-semibold text-gray-900 tracking-tight">scribe-my-bitch-up</span>
+        </div>
         <Group gap="xs">
           {downloadedModels.length > 0 && (
             <Select
@@ -114,7 +118,7 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
             <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.06em' }}>
               Sessions
             </Text>
-            <Button size="xs" variant="subtle" color="indigo" onClick={handleNewSession}>
+            <Button size="xs" variant="subtle" color="orange" onClick={handleNewSession}>
               + New
             </Button>
           </div>
@@ -165,7 +169,7 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
             <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.06em' }}>
               Speakers
             </Text>
-            <Button size="xs" variant="subtle" color="indigo" onClick={() => setAddingSpeaker(true)}>
+            <Button size="xs" variant="subtle" color="orange" onClick={() => setAddingSpeaker(true)}>
               + Add
             </Button>
           </div>
@@ -185,7 +189,7 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
                   autoFocus
                 />
                 <Group gap="xs" mt="xs">
-                  <Button size="xs" flex={1} color="indigo" onClick={handleAddSpeaker}>
+                  <Button size="xs" flex={1} color="orange" onClick={handleAddSpeaker}>
                     Add
                   </Button>
                   <Button
