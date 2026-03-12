@@ -5,6 +5,10 @@ import icon from '../../resources/icon.png?asset'
 import { registerHandlers } from './ipc'
 import { getSettings, applyStoragePath } from './storage'
 
+if (process.env.SMBU_USER_DATA_DIR) {
+  app.setPath('userData', process.env.SMBU_USER_DATA_DIR)
+}
+
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
     width: 1100,

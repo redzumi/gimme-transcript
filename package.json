@@ -1,6 +1,6 @@
 {
   "name": "scribe-my-bitch-up",
-  "version": "1.1.7",
+  "version": "1.1.8",
   "description": "Local desktop transcription for multi-speaker audio using whisper.cpp.",
   "main": "./out/main/index.js",
   "author": "redzumi",
@@ -39,6 +39,7 @@
     "build": "npm run typecheck && electron-vite build",
     "prepare": "husky",
     "postinstall": "electron-builder install-app-deps",
+    "screenshots": "npm run build && node scripts/capture-screenshots.mjs",
     "whisper:setup": "node scripts/build-whisper.mjs",
     "prebuild:mac": "node scripts/build-whisper.mjs",
     "build:mac": "electron-vite build && electron-builder --mac",
@@ -76,6 +77,7 @@
     "eslint-plugin-react-refresh": "^0.4.24",
     "husky": "^9.1.7",
     "lint-staged": "^16.3.3",
+    "playwright": "^1.58.2",
     "postcss": "^8.4.49",
     "prettier": "^3.7.4",
     "react": "^19.2.1",

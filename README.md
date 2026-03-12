@@ -1,6 +1,6 @@
 # scribe-my-bitch-up
 
-![SMBU logo](./docs/branding/logo-variants/logo.png)
+<img src="./docs/branding/logo-variants/logo.png" alt="SMBU logo" width="220" />
 
 Local desktop transcription for multi-speaker audio. No cloud, no API keys, no data leaves your machine.
 
@@ -14,6 +14,13 @@ Local desktop transcription for multi-speaker audio. No cloud, no API keys, no d
 The project is macOS-first for MVP. Linux and Windows build configs exist in the repo, but they are not the primary supported targets yet.
 
 The current branding source lives in [docs/branding/logo-variants/logo.svg](./docs/branding/logo-variants/logo.svg).
+
+## Screenshots
+
+<img src="./docs/screenshots/first-launch.png" alt="First launch screen" width="49%" />
+<img src="./docs/screenshots/home.png" alt="Home screen" width="49%" />
+<img src="./docs/screenshots/session.png" alt="Session screen" width="49%" />
+<img src="./docs/screenshots/settings.png" alt="Settings screen" width="49%" />
 
 ## Why this exists
 
