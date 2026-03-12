@@ -1,10 +1,29 @@
 {
   "name": "scribe-my-bitch-up",
   "version": "1.1.6",
-  "description": "An Electron application with React and TypeScript",
+  "description": "Local desktop transcription for multi-speaker audio using whisper.cpp.",
   "main": "./out/main/index.js",
-  "author": "example.com",
-  "homepage": "https://electron-vite.org",
+  "author": "redzumi",
+  "license": "MIT",
+  "homepage": "https://github.com/redzumi/scribe-my-bitch-up",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/redzumi/scribe-my-bitch-up.git"
+  },
+  "bugs": {
+    "url": "https://github.com/redzumi/scribe-my-bitch-up/issues"
+  },
+  "keywords": [
+    "electron",
+    "react",
+    "typescript",
+    "whisper",
+    "whisper.cpp",
+    "transcription",
+    "speech-to-text",
+    "offline",
+    "desktop-app"
+  ],
   "scripts": {
     "format": "prettier --write .",
     "format:check": "prettier --check .",

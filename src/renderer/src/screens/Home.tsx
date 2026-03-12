@@ -28,14 +28,14 @@ const STATUS_DOT: Record<string, string> = {
   idle: 'bg-gray-300',
   transcribing: 'bg-blue-400',
   done: 'bg-emerald-400',
-  labeled: 'bg-violet-400',
+  labeled: 'bg-violet-400'
 }
 
 const STATUS_LABEL: Record<string, string> = {
   idle: 'idle',
   transcribing: 'transcribing…',
   done: 'done',
-  labeled: 'labeled',
+  labeled: 'labeled'
 }
 
 function getSessionName(s: Session): string {
@@ -54,6 +54,7 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
   const [renameValue, setRenameValue] = useState('')
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null)
   const [newMenuOpen, setNewMenuOpen] = useState(false)
+  const [sessionProgress, setSessionProgress] = useState<Map<string, number>>(new Map())
   const renameInputRef = useRef<HTMLInputElement>(null)
 
   const reload = useCallback(async () => {
@@ -61,7 +62,7 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
       window.api.invoke('sessions:list'),
       window.api.invoke('speakers:list'),
       window.api.invoke('settings:get'),
-      window.api.invoke('models:list'),
+      window.api.invoke('models:list')
     ])
     setSessions(s)
     setSpeakers(sp)
@@ -70,7 +71,24 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
   }, [])
 
   useEffect(() => {
-    reload()
+    void Promise.resolve().then(reload)
+
+    const offProgress = window.api.on('whisper:progress', ({ sessionId, percent }) => {
+      setSessionProgress((prev) => new Map(prev).set(sessionId, percent))
+    })
+    const offDone = window.api.on('whisper:done', ({ sessionId }) => {
+      setSessionProgress((prev) => {
+        const next = new Map(prev)
+        next.delete(sessionId)
+        return next
+      })
+      reload()
+    })
+
+    return () => {
+      offProgress()
+      offDone()
+    }
   }, [reload])
 
   useEffect(() => {
@@ -104,7 +122,7 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
         start: 0,
         end: 0,
         text: b,
-        speakerId: null,
+        speakerId: null
       }))
     const firstWords = segments[0]?.text.slice(0, 40) ?? 'Imported text'
     const name = firstWords.length < (segments[0]?.text.length ?? 0) ? firstWords + '…' : firstWords
@@ -173,40 +191,47 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
   }
 
   const filteredSessions = search.trim()
-    ? sessions.filter((s) =>
-        getSessionName(s).toLowerCase().includes(search.trim().toLowerCase())
-      )
+    ? sessions.filter((s) => getSessionName(s).toLowerCase().includes(search.trim().toLowerCase()))
     : sessions
 
   return (
-    <div className="flex flex-col h-screen bg-white" onClick={() => { closeContextMenu(); setNewMenuOpen(false) }}>
-      {/* Context menu */}
-      {contextMenu && (() => {
-        const session = sessions.find((s) => s.id === contextMenu.sessionId)
-        if (!session) return null
-        return (
-          <div
-            className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[140px]"
-            style={{ top: contextMenu.y, left: contextMenu.x }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
-              onClick={(e) => handleStartRename(e, session)}
+    <div
+      className="flex flex-col h-screen bg-white"
+      onClick={() => {
+        closeContextMenu()
+        setNewMenuOpen(false)
+      }}
+    >
+      {contextMenu &&
+        (() => {
+          const session = sessions.find((s) => s.id === contextMenu.sessionId)
+          if (!session) return null
+          return (
+            <div
+              className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[140px]"
+              style={{ top: contextMenu.y, left: contextMenu.x }}
+              onClick={(e) => e.stopPropagation()}
             >
-              <span className="text-base">✎</span> Rename
-            </button>
-            <div className="border-t border-gray-100 my-1" />
-            <button
-              className="w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors flex items-center gap-2"
-              onClick={(e) => { handleDeleteSession(e, contextMenu.sessionId); closeContextMenu() }}
-            >
-              <span className="text-base">✕</span> Delete
-            </button>
-          </div>
-        )
-      })()}
-      {/* Header */}
+              <button
+                className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+                onClick={(e) => handleStartRename(e, session)}
+              >
+                <span className="text-base">✎</span> Rename
+              </button>
+              <div className="border-t border-gray-100 my-1" />
+              <button
+                className="w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors flex items-center gap-2"
+                onClick={(e) => {
+                  handleDeleteSession(e, contextMenu.sessionId)
+                  closeContextMenu()
+                }}
+              >
+                <span className="text-base">✕</span> Delete
+              </button>
+            </div>
+          )
+        })()}
+
       <div className="flex items-center justify-between px-5 h-11 border-b border-gray-200 shrink-0">
         <div className="flex items-center">
           <Logo size={28} />
@@ -221,22 +246,31 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
               styles={{ input: { minWidth: 80 } }}
             />
           )}
-          <ActionIcon variant="subtle" size="sm" color="gray" onClick={onOpenSettings} title="Settings">
+          <ActionIcon
+            variant="subtle"
+            size="sm"
+            color="gray"
+            onClick={onOpenSettings}
+            title="Settings"
+          >
             <span style={{ fontSize: 14 }}>⚙</span>
           </ActionIcon>
         </Group>
       </div>
 
-      {/* Body */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sessions */}
         <div className="flex flex-col flex-1 min-w-0 border-r border-gray-200">
           <div className="flex items-center justify-between px-5 py-2.5 border-b border-gray-100">
             <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.06em' }}>
               Sessions
             </Text>
             <div className="relative" onClick={(e) => e.stopPropagation()}>
-              <Button size="xs" variant="subtle" color="orange" onClick={() => setNewMenuOpen((o) => !o)}>
+              <Button
+                size="xs"
+                variant="subtle"
+                color="orange"
+                onClick={() => setNewMenuOpen((o) => !o)}
+              >
                 + New ▾
               </Button>
               {newMenuOpen && (
@@ -265,7 +299,6 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
             </div>
           </div>
 
-          {/* Search */}
           <div className="px-5 py-2 border-b border-gray-100">
             <TextInput
               size="xs"
@@ -281,11 +314,17 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
               <div className="flex flex-col items-center justify-center h-40 gap-1">
                 {sessions.length === 0 ? (
                   <>
-                    <Text size="sm" c="dimmed">No sessions yet</Text>
-                    <Text size="xs" c="dimmed">Click "+ New" to import an audio file</Text>
+                    <Text size="sm" c="dimmed">
+                      No sessions yet
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      Click "+ New" to import an audio file
+                    </Text>
                   </>
                 ) : (
-                  <Text size="sm" c="dimmed">No sessions match your search</Text>
+                  <Text size="sm" c="dimmed">
+                    No sessions match your search
+                  </Text>
                 )}
               </div>
             ) : (
@@ -325,8 +364,15 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
                           </p>
                         )}
                         <p className="m-0 mt-0.5 flex items-center gap-1.5">
-                          <span className={`inline-block w-1.5 h-1.5 rounded-full ${STATUS_DOT[key]}`} />
+                          <span
+                            className={`inline-block w-1.5 h-1.5 rounded-full ${STATUS_DOT[key]}`}
+                          />
                           <span className="text-xs text-gray-500">{STATUS_LABEL[key]}</span>
+                          {key === 'transcribing' && sessionProgress.has(s.id) && (
+                            <span className="text-xs text-blue-400 font-medium">
+                              {Math.round(sessionProgress.get(s.id) ?? 0)}%
+                            </span>
+                          )}
                           <span className="text-gray-300 text-xs">·</span>
                           <span className="text-xs text-gray-400">{formatAgo(s.createdAt)}</span>
                         </p>
@@ -341,13 +387,17 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
           </ScrollArea>
         </div>
 
-        {/* Speakers */}
         <div className="flex flex-col w-52 shrink-0">
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
             <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.06em' }}>
               Speakers
             </Text>
-            <Button size="xs" variant="subtle" color="orange" onClick={() => setAddingSpeaker(true)}>
+            <Button
+              size="xs"
+              variant="subtle"
+              color="orange"
+              onClick={() => setAddingSpeaker(true)}
+            >
               + Add
             </Button>
           </div>
