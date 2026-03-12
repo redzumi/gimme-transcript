@@ -11,7 +11,7 @@
 - label speakers manually per segment or in bulk
 - export clean transcripts as Markdown or plain text
 
-The project is macOS-first for MVP. Linux and Windows build configs exist in the repo, but they are not the primary supported targets yet.
+Current status: macOS is in MVP. Linux and Windows built but not tested.
 
 ## Why this exists
 
