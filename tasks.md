@@ -27,11 +27,11 @@
 
 ## Phase 2: Whisper Integration
 
-- [ ] **T-020** Bundle whisper.cpp binary into `resources/` (macOS arm64 + x64)
-- [ ] **T-021** Implement model download manager (fetch from Hugging Face, progress events via IPC)
-- [ ] **T-022** Implement Whisper runner (`child_process.spawn`, parse stdout segments, stream via IPC)
-- [ ] **T-023** Segment parser — convert whisper.cpp stdout to `Segment[]` objects with timestamps
-- [ ] **T-024** Cancel transcription (kill subprocess gracefully)
+- [x] **T-020** Bundle whisper.cpp binary into `resources/` (macOS arm64 + x64)
+- [x] **T-021** Implement model download manager (fetch from Hugging Face, progress events via IPC)
+- [x] **T-022** Implement Whisper runner (`child_process.spawn`, parse stdout segments, stream via IPC)
+- [x] **T-023** Segment parser — convert whisper.cpp stdout to `Segment[]` objects with timestamps
+- [x] **T-024** Cancel transcription (kill subprocess gracefully)
 
 ---
 

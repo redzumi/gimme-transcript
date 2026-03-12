@@ -3,6 +3,7 @@ import { registerSpeakerHandlers } from './speakers'
 import { registerSettingsHandlers } from './settings'
 import { registerDialogHandlers } from './dialog'
 import { registerModelHandlers } from './models'
+import { registerWhisperHandlers } from './whisper'
 
 export function registerHandlers(): void {
   registerSessionHandlers()
@@ -10,4 +11,5 @@ export function registerHandlers(): void {
   registerSettingsHandlers()
   registerDialogHandlers()
   registerModelHandlers()
+  registerWhisperHandlers()
 }

@@ -5,7 +5,7 @@ export function registerDialogHandlers(): void {
     const win = BrowserWindow.fromWebContents(event.sender)
     const result = await dialog.showOpenDialog(win ?? BrowserWindow.getFocusedWindow()!, {
       title: 'Select audio file(s)',
-      filters: [{ name: 'Audio', extensions: ['mp3', 'm4a', 'wav', 'ogg'] }],
+      filters: [{ name: 'Audio', extensions: ['mp3', 'm4a', 'wav', 'ogg', 'qta', 'flac', 'aac', 'opus', 'wma', 'aiff', 'aif', 'webm', 'mkv'] }],
       properties: ['openFile', 'multiSelections']
     })
     return result.canceled ? null : result.filePaths

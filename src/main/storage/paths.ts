@@ -4,6 +4,8 @@ import { mkdirSync } from 'fs'
 import type { Settings } from '../../renderer/src/types/ipc'
 
 let _customStoragePath: string | null = null
+let _sessionsDirCache: string | null = null
+let _modelsDirCache: string | null = null
 
 export function getAppDataPath(): string {
   return app.getPath('userData')
@@ -11,6 +13,8 @@ export function getAppDataPath(): string {
 
 export function setCustomStoragePath(p: string | null): void {
   _customStoragePath = p
+  _sessionsDirCache = null
+  _modelsDirCache = null
 }
 
 function getBasePath(): string {
@@ -18,8 +22,10 @@ function getBasePath(): string {
 }
 
 export function getSessionsDir(): string {
+  if (_sessionsDirCache) return _sessionsDirCache
   const p = join(getBasePath(), 'sessions')
   mkdirSync(p, { recursive: true })
+  _sessionsDirCache = p
   return p
 }
 
@@ -36,8 +42,10 @@ export function getSettingsPath(): string {
 }
 
 export function getModelsDir(): string {
+  if (_modelsDirCache) return _modelsDirCache
   const p = join(getBasePath(), 'models')
   mkdirSync(p, { recursive: true })
+  _modelsDirCache = p
   return p
 }
 
