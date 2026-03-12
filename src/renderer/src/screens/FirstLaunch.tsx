@@ -72,11 +72,8 @@ export default function FirstLaunch({ onDone }: Props): React.JSX.Element {
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
         <Stack gap="xl">
           <div>
-            <div className="flex items-center gap-2.5 mb-3">
-              <Logo size={32} />
-              <h1 className="text-base font-semibold text-gray-900 tracking-tight">
-                scribe-my-bitch-up
-              </h1>
+            <div className="mb-4">
+              <Logo size={44} />
             </div>
             <p className="text-sm text-gray-500 leading-relaxed">
               To get started, download a Whisper model.

@@ -26,6 +26,44 @@ export interface ConvertResult {
   tempFile: boolean
 }
 
+export function convertForPlayback(
+  inputPath: string,
+  outputPath: string,
+  onProgress: (percent: number) => void
+): Promise<void> {
+  const ffmpeg = findFfmpeg()
+  if (!ffmpeg) return Promise.reject(new Error('ffmpeg not found. Install with: brew install ffmpeg'))
+
+  return new Promise((resolve, reject) => {
+    const proc = spawn(ffmpeg, [
+      '-y', '-i', inputPath,
+      '-vn', '-acodec', 'libmp3lame', '-b:a', '128k',
+      outputPath
+    ])
+
+    let totalSeconds = 0
+
+    proc.stderr.on('data', (data: Buffer) => {
+      const text = data.toString()
+      if (!totalSeconds) {
+        const m = text.match(/Duration:\s*(\d+):(\d+):(\d+\.\d+)/)
+        if (m) totalSeconds = +m[1] * 3600 + +m[2] * 60 + parseFloat(m[3])
+      }
+      const tm = text.match(/time=(\d+):(\d+):(\d+\.\d+)/)
+      if (tm && totalSeconds > 0) {
+        const cur = +tm[1] * 3600 + +tm[2] * 60 + parseFloat(tm[3])
+        onProgress(Math.min(99, (cur / totalSeconds) * 100))
+      }
+    })
+
+    proc.on('close', (code) => {
+      if (code === 0) { onProgress(100); resolve() }
+      else reject(new Error(`ffmpeg exited with code ${code}`))
+    })
+    proc.on('error', reject)
+  })
+}
+
 export function prepareAudio(inputPath: string): Promise<ConvertResult> {
   if (NATIVE_FORMATS.has(ext(inputPath))) {
     return Promise.resolve({ audioPath: inputPath, tempFile: false })

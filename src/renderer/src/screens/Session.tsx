@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Text, Button, Group, Progress, ScrollArea, Select, Modal, Checkbox } from '@mantine/core'
 import type { Session, Segment, Speaker, WhisperModel } from '../types/ipc'
 
@@ -33,7 +33,21 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
   const [anchorIdx, setAnchorIdx] = useState<number | null>(null)
   const [focusIdx, setFocusIdx] = useState<number | null>(null)
   const [mergeOpen, setMergeOpen] = useState(false)
+  const [segCtxMenu, setSegCtxMenu] = useState<{ x: number; y: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState('')
+  const [playingId, setPlayingId] = useState<string | null>(null)
+  const [converting, setConverting] = useState(false)
+  const [convertProgress, setConvertProgress] = useState(0)
+  const [pendingSeg, setPendingSeg] = useState<Segment | null>(null)
+  const editRef = useRef<HTMLTextAreaElement>(null)
+  const audioRef = useRef<HTMLAudioElement>(null)
+  const playEndRef = useRef<number>(0)
+  const isDraggingRef = useRef(false)
+  const didDragRef = useRef(false)
+
+  const SUPPORTED_EXTS = new Set(['mp3', 'm4a', 'mp4', 'wav', 'ogg', 'flac', 'aac', 'opus', 'webm'])
 
   const reload = useCallback(async () => {
     const [s, sp, modelList] = await Promise.all([
@@ -41,6 +55,11 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
       window.api.invoke('speakers:list'),
       window.api.invoke('models:list'),
     ])
+    // Reset old VBR-converted files — they cause inaccurate seeks
+    if (s?.convertedAudioPath && !s.audioConvertedCBR) {
+      await window.api.invoke('audio:reset-converted', sessionId)
+      s.convertedAudioPath = undefined
+    }
     setSession(s)
     setSpeakers(sp)
     setDownloadedModels(modelList.filter((m) => m.downloaded).map((m) => m.model))
@@ -67,13 +86,40 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
       setError(message)
     })
 
+    const offConvertProgress = window.api.on('audio:convert-progress', ({ sessionId: sid, percent }) => {
+      if (sid !== sessionId) return
+      setConvertProgress(percent)
+    })
+    const offConvertDone = window.api.on('audio:convert-done', ({ sessionId: sid, convertedAudioPath }) => {
+      if (sid !== sessionId) return
+      setConverting(false)
+      setConvertProgress(0)
+      setSession((prev) => prev ? { ...prev, convertedAudioPath } : prev)
+      // pendingSeg остаётся — useEffect ниже дождётся canplay и сыграет
+    })
+    const offConvertError = window.api.on('audio:convert-error', ({ sessionId: sid, message }) => {
+      if (sid !== sessionId) return
+      setConverting(false)
+      setPendingSeg(null)
+      console.error('[convert] error:', message)
+    })
+
     return () => {
       offSegment()
       offProgress()
       offDone()
       offError()
+      offConvertProgress()
+      offConvertDone()
+      offConvertError()
     }
   }, [sessionId, reload])
+
+  useEffect(() => {
+    const onMouseUp = (): void => { isDraggingRef.current = false }
+    window.addEventListener('mouseup', onMouseUp)
+    return () => window.removeEventListener('mouseup', onMouseUp)
+  }, [])
 
   // speakerId → color index
   const speakerColorMap = useMemo(() => {
@@ -105,6 +151,117 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
     setFocusIdx(null)
   }
 
+  async function handleMergeSelected(): Promise<void> {
+    if (!session || selectedIds.size < 2) return
+    setSegCtxMenu(null)
+    const selected = session.segments.filter((s) => selectedIds.has(s.id))
+    const merged: Segment = {
+      id: selected[0].id,
+      start: selected[0].start,
+      end: selected[selected.length - 1].end,
+      text: selected.map((s) => s.text.trim()).join(' '),
+      speakerId: selected[0].speakerId,
+    }
+    const segments = session.segments
+      .filter((s) => !selectedIds.has(s.id) || s.id === merged.id)
+      .map((s) => (s.id === merged.id ? merged : s))
+    const updated = await window.api.invoke('sessions:update', sessionId, { segments })
+    setSession(updated)
+    clearSelection()
+  }
+
+  function handleEditStart(seg: Segment): void {
+    setEditingId(seg.id)
+    setEditValue(seg.text.trim())
+    clearSelection()
+    // focus на следующий тик после рендера
+    setTimeout(() => {
+      editRef.current?.focus()
+      editRef.current?.select()
+    }, 0)
+  }
+
+  async function handleEditSave(segId: string): Promise<void> {
+    if (!session) return
+    const text = editValue.trim()
+    if (!text) { setEditingId(null); return }
+    const segments = session.segments.map((s) =>
+      s.id === segId ? { ...s, text } : s
+    )
+    const updated = await window.api.invoke('sessions:update', sessionId, { segments })
+    setSession(updated)
+    setEditingId(null)
+  }
+
+  function handleEditCancel(): void {
+    setEditingId(null)
+  }
+
+  const hasAudio = !!session?.audioFile && session.audioFile !== ''
+  const audioSrc = hasAudio
+    ? 'file://' + encodeURI(session!.convertedAudioPath ?? session!.audioFile)
+    : undefined
+
+  function playSegment(seg: Segment): void {
+    const audio = audioRef.current
+    if (!audio) return
+    if (playingId === seg.id) {
+      audio.pause()
+      setPlayingId(null)
+      return
+    }
+    playEndRef.current = seg.end
+    audio.currentTime = seg.start
+    audio.play()
+      .then(() => setPlayingId(seg.id))
+      .catch((err) => console.error('[audio] play failed:', err))
+  }
+
+  function handlePlaySegment(seg: Segment): void {
+    if (!session) return
+    // Already converted — play directly
+    if (session.convertedAudioPath) { playSegment(seg); return }
+    // Format supported natively — play directly
+    const ext = session.audioFile.split('.').pop()?.toLowerCase() ?? ''
+    if (SUPPORTED_EXTS.has(ext)) { playSegment(seg); return }
+    // Unsupported format — need conversion
+    setPendingSeg(seg)
+    setConvertProgress(0)
+    setConverting(true)
+    window.api.invoke('audio:convert', sessionId)
+  }
+
+  // После конвертации — ждём canplay и воспроизводим
+  useEffect(() => {
+    if (!pendingSeg || !session?.convertedAudioPath) return
+    const audio = audioRef.current
+    if (!audio) return
+    const onCanPlay = (): void => {
+      playSegment(pendingSeg)
+      setPendingSeg(null)
+    }
+    audio.addEventListener('canplay', onCanPlay, { once: true })
+    return () => audio.removeEventListener('canplay', onCanPlay)
+  }, [pendingSeg, session?.convertedAudioPath]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    const onTimeUpdate = (): void => {
+      if (audio.currentTime >= playEndRef.current) {
+        audio.pause()
+        setPlayingId(null)
+      }
+    }
+    const onEnded = (): void => setPlayingId(null)
+    audio.addEventListener('timeupdate', onTimeUpdate)
+    audio.addEventListener('ended', onEnded)
+    return () => {
+      audio.removeEventListener('timeupdate', onTimeUpdate)
+      audio.removeEventListener('ended', onEnded)
+    }
+  }, [audioSrc])
+
   async function handleTranscribe(): Promise<void> {
     setError(null)
     setSession((prev) => (prev ? { ...prev, status: 'transcribing' } : prev))
@@ -119,8 +276,9 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
 
   async function handleAssignSelected(speakerId: string): Promise<void> {
     if (!session || selectedIds.size === 0) return
+    const resolvedId = speakerId === '__none__' ? null : speakerId
     const segments = session.segments.map((seg) =>
-      selectedIds.has(seg.id) ? { ...seg, speakerId } : seg
+      selectedIds.has(seg.id) ? { ...seg, speakerId: resolvedId } : seg
     )
     const updated = await window.api.invoke('sessions:update', sessionId, { segments })
     setSession(updated)
@@ -149,9 +307,77 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
     <div
       className="flex flex-col h-screen bg-white"
       onClick={(e) => {
+        if (didDragRef.current) return
+        setSegCtxMenu(null)
         if (!(e.target as Element).closest('[data-segment]')) clearSelection()
       }}
     >
+      {audioSrc && (
+        <audio
+          ref={audioRef}
+          src={audioSrc}
+          preload="auto"
+          style={{ display: 'none' }}
+          onError={(e) => console.error('[audio] load error:', (e.target as HTMLAudioElement).error)}
+        />
+      )}
+
+      {segCtxMenu && selectedIds.size >= 1 && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setSegCtxMenu(null)} />
+          <div
+            className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[180px]"
+            style={{ top: segCtxMenu.y, left: segCtxMenu.x }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-3 py-1 text-[10px] text-gray-400 uppercase tracking-wider font-medium">
+            {selectedIds.size} segment{selectedIds.size > 1 ? 's' : ''}
+          </div>
+          <div className="border-t border-gray-100 my-1" />
+          {speakers.map((sp) => {
+            const colorIdx = speakerColorMap.get(sp.id) ?? 0
+            const colors = SPEAKER_COLORS[colorIdx % SPEAKER_COLORS.length]
+            return (
+              <button
+                key={sp.id}
+                className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+                onClick={() => { handleAssignSelected(sp.id); setSegCtxMenu(null) }}
+              >
+                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${colors.pill}`}>
+                  {sp.name}
+                </span>
+              </button>
+            )
+          })}
+          <button
+            className="w-full text-left px-3 py-1.5 text-sm text-gray-400 hover:bg-gray-50 transition-colors"
+            onClick={() => { handleAssignSelected('__none__'); setSegCtxMenu(null) }}
+          >
+            — unassign
+          </button>
+          {selectedIds.size >= 2 && (
+            <>
+              <div className="border-t border-gray-100 my-1" />
+              <button
+                className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                onClick={handleMergeSelected}
+              >
+                Merge {selectedIds.size} segments
+              </button>
+            </>
+          )}
+          </div>
+        </>
+      )}
+
+      <Modal opened={converting} onClose={() => {}} withCloseButton={false} centered size="sm">
+        <div className="flex flex-col gap-4 py-2">
+          <Text size="sm" fw={500}>Converting audio for playback…</Text>
+          <Progress value={convertProgress} animated size="sm" color="orange" />
+          <Text size="xs" c="dimmed" ta="right">{Math.round(convertProgress)}%</Text>
+        </div>
+      </Modal>
+
       {/* Header */}
       <div className="flex items-center gap-2 px-4 h-11 border-b border-gray-200 shrink-0">
         <button
@@ -263,10 +489,23 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
           <div className="py-6">
             {session.segments.length === 0 && session.status === 'transcribing' && (
               <div className="flex items-center justify-center h-20">
-                <Text size="sm" c="dimmed">
-                  Waiting for first segment…
-                </Text>
+                <Text size="sm" c="dimmed">Waiting for first segment…</Text>
               </div>
+            )}
+
+            {session.segments.length === 0 && session.status === 'done' && (
+              <PasteArea onSubmit={async (text) => {
+                const blocks = text.includes('\n\n') ? text.split(/\n\n+/) : text.split(/\n/)
+                const segments = blocks
+                  .map((b) => b.trim())
+                  .filter((b) => b.length > 0)
+                  .map((b, i) => ({
+                    id: `pasted-${i}-${Math.random().toString(36).slice(2)}`,
+                    start: 0, end: 0, text: b, speakerId: null,
+                  }))
+                const updated = await window.api.invoke('sessions:update', sessionId, { segments })
+                setSession(updated)
+              }} />
             )}
 
             {session.segments.map((seg, idx) => {
@@ -274,20 +513,52 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
               const colorIdx = speaker ? (speakerColorMap.get(speaker.id) ?? 0) : -1
               const colors = colorIdx >= 0 ? SPEAKER_COLORS[colorIdx % SPEAKER_COLORS.length] : null
               const isSelected = selectedIds.has(seg.id)
+              const isEditing = editingId === seg.id
 
               return (
                 <div
                   key={seg.id}
                   data-segment
-                  className={`flex gap-0 px-10 py-2 cursor-pointer select-none transition-colors ${
-                    isSelected ? 'bg-orange-50' : 'hover:bg-gray-50'
+                  className={`flex gap-0 py-2 transition-colors ${
+                    isEditing
+                      ? 'bg-white px-10'
+                      : `cursor-pointer select-none ${
+                          isSelected
+                            ? 'bg-orange-100 pl-[calc(2.5rem-3px)] pr-10 border-l-[3px] border-orange-400'
+                            : 'px-10 hover:bg-gray-50'
+                        }`
                   }`}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    if (!isSelected) {
+                      setAnchorIdx(idx)
+                      setFocusIdx(idx)
+                    }
+                    setSegCtxMenu({ x: e.clientX, y: e.clientY })
+                  }}
+                  onMouseDown={(e) => {
+                    if (e.button !== 0 || isEditing) return
+                    isDraggingRef.current = true
+                    didDragRef.current = false
+                    if (!e.shiftKey) {
+                      setAnchorIdx(idx)
+                      setFocusIdx(idx)
+                    }
+                  }}
+                  onMouseEnter={() => {
+                    if (!isDraggingRef.current) return
+                    didDragRef.current = true
+                    setFocusIdx(idx)
+                  }}
                   onClick={(e) => {
+                    if (isEditing) return
+                    if (didDragRef.current) { didDragRef.current = false; return }
                     e.stopPropagation()
                     handleSegmentClick(idx, e.shiftKey)
                   }}
                 >
-                  {/* Left: speaker + timestamp */}
+                  {/* Left: speaker + timestamp + play */}
                   <div className="w-32 shrink-0 flex flex-col items-end gap-0.5 pr-4 pt-0.5">
                     {speaker ? (
                       <span
@@ -301,12 +572,44 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
                     <span className="text-[10px] font-mono text-gray-300">
                       {formatTime(seg.start)}
                     </span>
+                    {hasAudio && seg.end > seg.start && (
+                      <button
+                        className={`text-[11px] leading-none transition-colors mt-0.5 ${
+                          playingId === seg.id
+                            ? 'text-orange-500'
+                            : 'text-gray-300 hover:text-orange-400'
+                        }`}
+                        title={playingId === seg.id ? 'Pause' : 'Play segment'}
+                        onClick={(e) => { e.stopPropagation(); handlePlaySegment(seg) }}
+                      >
+                        {playingId === seg.id ? '⏸' : '▶'}
+                      </button>
+                    )}
                   </div>
 
-                  {/* Right: text */}
-                  <p className="flex-1 text-sm text-gray-800 leading-relaxed m-0">
-                    {seg.text.trim()}
-                  </p>
+                  {/* Right: text or editor */}
+                  {isEditing ? (
+                    <textarea
+                      ref={editRef}
+                      className="flex-1 text-sm text-gray-800 leading-relaxed resize-none outline-none border border-orange-300 rounded px-2 py-0.5 bg-orange-50 focus:bg-white transition-colors"
+                      value={editValue}
+                      rows={Math.max(2, editValue.split('\n').length)}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onBlur={() => handleEditSave(seg.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') { e.preventDefault(); handleEditCancel() }
+                        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleEditSave(seg.id) }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <p
+                      className="flex-1 text-sm text-gray-800 leading-relaxed m-0"
+                      onDoubleClick={(e) => { e.stopPropagation(); handleEditStart(seg) }}
+                    >
+                      {seg.text.trim()}
+                    </p>
+                  )}
                 </div>
               )
             })}
@@ -337,6 +640,43 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
         currentSessionId={sessionId}
         speakers={speakers}
       />
+    </div>
+  )
+}
+
+// ─── PasteArea ────────────────────────────────────────────────────────────────
+
+function PasteArea({ onSubmit }: { onSubmit: (text: string) => Promise<void> }): React.JSX.Element {
+  const [value, setValue] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function handleSubmit(): Promise<void> {
+    const text = value.trim()
+    if (!text) return
+    setLoading(true)
+    await onSubmit(text)
+  }
+
+  return (
+    <div className="flex flex-col h-full px-10 py-8 gap-4" onClick={(e) => e.stopPropagation()}>
+      <textarea
+        className="flex-1 min-h-[300px] w-full text-sm text-gray-800 leading-relaxed resize-none outline-none border border-gray-200 rounded-lg p-4 placeholder-gray-300 focus:border-orange-300 transition-colors"
+        placeholder="Paste your text here…&#10;&#10;Each paragraph will become a separate segment."
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        autoFocus
+      />
+      <div className="flex justify-end">
+        <Button
+          color="orange"
+          size="sm"
+          disabled={!value.trim() || loading}
+          loading={loading}
+          onClick={handleSubmit}
+        >
+          Split into segments
+        </Button>
+      </div>
     </div>
   )
 }

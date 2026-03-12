@@ -53,6 +53,7 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null)
+  const [newMenuOpen, setNewMenuOpen] = useState(false)
   const renameInputRef = useRef<HTMLInputElement>(null)
 
   const reload = useCallback(async () => {
@@ -80,11 +81,42 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
   }, [renamingId])
 
   async function handleNewSession(): Promise<void> {
+    setNewMenuOpen(false)
     const files = await window.api.invoke('dialog:open-audio')
     if (!files) return
     for (const file of files) {
       await window.api.invoke('sessions:create', file, currentModel, 'auto')
     }
+    reload()
+  }
+
+  async function handleImportText(): Promise<void> {
+    setNewMenuOpen(false)
+    const result = await window.api.invoke('dialog:open-text')
+    if (!result) return
+    const { path, content } = result
+    const blocks = content.includes('\n\n') ? content.split(/\n\n+/) : content.split(/\n/)
+    const segments = blocks
+      .map((b) => b.trim())
+      .filter((b) => b.length > 0)
+      .map((b, i) => ({
+        id: `imported-${i}-${Math.random().toString(36).slice(2)}`,
+        start: 0,
+        end: 0,
+        text: b,
+        speakerId: null,
+      }))
+    const firstWords = segments[0]?.text.slice(0, 40) ?? 'Imported text'
+    const name = firstWords.length < (segments[0]?.text.length ?? 0) ? firstWords + '…' : firstWords
+    const session = await window.api.invoke('sessions:create', path, currentModel, 'auto')
+    await window.api.invoke('sessions:update', session.id, { segments, status: 'done', name })
+    reload()
+  }
+
+  async function handleEmptySession(): Promise<void> {
+    setNewMenuOpen(false)
+    const session = await window.api.invoke('sessions:create', '', currentModel, 'auto')
+    await window.api.invoke('sessions:update', session.id, { name: 'New session', status: 'done' })
     reload()
   }
 
@@ -147,7 +179,7 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
     : sessions
 
   return (
-    <div className="flex flex-col h-screen bg-white" onClick={closeContextMenu}>
+    <div className="flex flex-col h-screen bg-white" onClick={() => { closeContextMenu(); setNewMenuOpen(false) }}>
       {/* Context menu */}
       {contextMenu && (() => {
         const session = sessions.find((s) => s.id === contextMenu.sessionId)
@@ -176,9 +208,8 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
       })()}
       {/* Header */}
       <div className="flex items-center justify-between px-5 h-11 border-b border-gray-200 shrink-0">
-        <div className="flex items-center gap-2">
-          <Logo size={22} />
-          <span className="text-sm font-semibold text-gray-900 tracking-tight">scribe-my-bitch-up</span>
+        <div className="flex items-center">
+          <Logo size={28} />
         </div>
         <Group gap="xs">
           {downloadedModels.length > 0 && (
@@ -204,9 +235,34 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
             <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.06em' }}>
               Sessions
             </Text>
-            <Button size="xs" variant="subtle" color="orange" onClick={handleNewSession}>
-              + New
-            </Button>
+            <div className="relative" onClick={(e) => e.stopPropagation()}>
+              <Button size="xs" variant="subtle" color="orange" onClick={() => setNewMenuOpen((o) => !o)}>
+                + New ▾
+              </Button>
+              {newMenuOpen && (
+                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[160px]">
+                  <button
+                    className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    onClick={handleNewSession}
+                  >
+                    Import audio
+                  </button>
+                  <button
+                    className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    onClick={handleImportText}
+                  >
+                    Import text
+                  </button>
+                  <div className="border-t border-gray-100 my-1" />
+                  <button
+                    className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    onClick={handleEmptySession}
+                  >
+                    Empty session
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Search */}

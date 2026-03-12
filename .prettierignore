@@ -1,5 +1,16 @@
 out
 dist
+node_modules
+.git
+.DS_Store
+.eslintcache
+package-lock.json
+yarn.lock
+build/icon.icns
+build/icon.ico
+build/icon.png
+resources/icon.png
+docs/branding/logo-variants/logo.png
 pnpm-lock.yaml
 LICENSE.md
 tsconfig.json

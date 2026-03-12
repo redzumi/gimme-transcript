@@ -7,6 +7,8 @@ export interface Session {
   name?: string
   createdAt: string
   audioFile: string
+  convertedAudioPath?: string
+  audioConvertedCBR?: boolean
   model: WhisperModel
   language: string
   status: 'idle' | 'transcribing' | 'done'
@@ -76,7 +78,12 @@ export interface IpcInvokeMap {
 
   // Native dialogs
   'dialog:open-audio': { args: []; return: string[] | null }
+  'dialog:open-text': { args: []; return: { path: string; content: string } | null }
   'dialog:save': { args: [defaultName: string]; return: string | null }
+
+  // Audio conversion
+  'audio:convert': { args: [sessionId: string]; return: void }
+  'audio:reset-converted': { args: [sessionId: string]; return: void }
 
   // File export
   'export:write': { args: [filePath: string, content: string]; return: void }
@@ -96,6 +103,9 @@ export interface IpcEventMap {
   'models:download-progress': { model: WhisperModel; percent: number; bytesPerSec: number }
   'models:download-done': { model: WhisperModel }
   'models:download-error': { model: WhisperModel; message: string }
+  'audio:convert-progress': { sessionId: string; percent: number }
+  'audio:convert-done': { sessionId: string; convertedAudioPath: string }
+  'audio:convert-error': { sessionId: string; message: string }
 }
 
 export type IpcEventChannel = keyof IpcEventMap

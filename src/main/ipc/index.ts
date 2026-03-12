@@ -4,6 +4,7 @@ import { registerSettingsHandlers } from './settings'
 import { registerDialogHandlers } from './dialog'
 import { registerModelHandlers } from './models'
 import { registerWhisperHandlers } from './whisper'
+import { registerAudioHandlers } from './audio'
 
 export function registerHandlers(): void {
   registerSessionHandlers()
@@ -12,4 +13,5 @@ export function registerHandlers(): void {
   registerDialogHandlers()
   registerModelHandlers()
   registerWhisperHandlers()
+  registerAudioHandlers()
 }
