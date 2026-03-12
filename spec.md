@@ -1,4 +1,4 @@
-# scribe-my-bitch-up — Product Spec
+# Gimme Transcript — Product Spec
 
 ## Problem
 
@@ -7,6 +7,7 @@ Recording multi-speaker meetings is easy. Getting a readable transcript with "wh
 ## Goal
 
 A desktop app (macOS first) that:
+
 1. Takes one or more audio files as input
 2. Transcribes them locally using Whisper
 3. Lets the user assign speakers to transcript segments
@@ -24,52 +25,58 @@ A desktop app (macOS first) that:
 
 ## Stack
 
-| Layer | Choice |
-|---|---|
-| App shell | Electron |
-| Build tool | Electron Vite |
-| UI | Mantine + Tailwind CSS |
+| Layer         | Choice                       |
+| ------------- | ---------------------------- |
+| App shell     | Electron                     |
+| Build tool    | Electron Vite                |
+| UI            | Mantine + Tailwind CSS       |
 | Transcription | whisper.cpp binary (bundled) |
-| Diarization | Manual (user-driven) |
-| Language | TypeScript |
-| Storage | JSON (local, AppData) |
-| Distribution | .dmg (GitHub Releases) |
-| License | MIT |
+| Diarization   | Manual (user-driven)         |
+| Language      | TypeScript                   |
+| Storage       | JSON (local, AppData)        |
+| Distribution  | .dmg (GitHub Releases)       |
+| License       | MIT                          |
 
 ---
 
 ## User Flow (MVP)
 
 ### 1. Import
+
 - User drops audio file(s) into the app (drag & drop or file picker)
 - Supported formats: `.mp3`, `.m4a`, `.wav`, `.ogg`
 - Each file = separate session with its own transcript and speaker labeling
 
 ### 2. Model setup (first run only)
+
 - App checks if Whisper model is downloaded
 - If not → shows download prompt with model size info
 - User can select model: `tiny / base / small / medium / large`
-- Downloaded to: `~/Library/Application Support/scribe-my-bitch-up/models/`
+- Downloaded to: `~/Library/Application Support/Gimme Transcript/models/`
 - Default: `medium` (best balance for Russian)
 
 ### 3. Transcription
+
 - User hits "Transcribe"
 - Whisper.cpp binary spawned via `child_process.spawn`
 - Segments streamed to UI in real time via stdout parsing
 - Language: auto-detect (can be overridden in Settings)
 
 ### 4. Speaker labeling
+
 - Each segment shows: `[timestamp] [Speaker ?] text`
 - User clicks "Speaker ?" → selects from speaker database or types new name
 - New name → added to global speaker database automatically
 - Bulk assign: select multiple segments → assign speaker in one click
 
 ### 5. Export
+
 - Per-file export or merge multiple files into one "meeting" document
 - Formats on export: Markdown, plain text
 - Internal storage format: JSON (with timestamps, speaker IDs, segments)
 
 Export example (Markdown):
+
 ```
 **Rustam** [00:00:12]
 We need to decide on the legal entity first.
@@ -91,7 +98,7 @@ I think Kazakhstan ТОО is the right move for now.
 ```
 ┌────────────────────────────────────────────────────┐
 │                                                    │
-│         scribe-my-bitch-up                        │
+│         Gimme Transcript                          │
 │                                                    │
 │   To get started, download a Whisper model.        │
 │   Models run locally — no internet after this.     │
@@ -106,18 +113,21 @@ I think Kazakhstan ТОО is the right move for now.
 ```
 
 **Downloading state:**
+
 ```
 │   Downloading medium… ████████░░░░  54%  780 MB/s  │
 │              [ Cancel ]                            │
 ```
 
 **Done state:**
+
 ```
 │   ✓ Model ready.                                   │
 │              [ Get started ]                       │
 ```
 
 **Notes:**
+
 - После скачивания → Home
 - Можно добавить/удалить модели позже в Settings
 - Если отменил → при следующем запуске снова показывается этот экран
@@ -130,7 +140,7 @@ Entry point. Two columns: sessions list + speakers sidebar.
 
 ```
 ┌────────────────────────────────────────────────────┐
-│  scribe-my-bitch-up        [model: medium ▾]  ⚙️   │
+│  Gimme Transcript        [model: medium ▾]  ⚙️     │
 ├─────────────────────────────┬──────────────────────┤
 │  Sessions                   │  Speakers            │
 │                             │                      │
@@ -149,12 +159,14 @@ Entry point. Two columns: sessions list + speakers sidebar.
 ```
 
 **States of a session row:**
+
 - `idle` — файл загружен, не транскрибирован
 - `transcribing… N%` — в процессе
 - `done` — транскрипт готов, можно открыть
 - `labeled` — транскрипт размечен по спикерам
 
 **Actions:**
+
 - Click session → открывает Session screen
 - `[+ New session]` → file picker → создаёт сессию в `idle`
 - `[model: medium ▾]` в шапке → смена модели без перехода в Settings
@@ -202,6 +214,7 @@ Whisper работает, сегменты стримятся в реально�
 ```
 
 **Notes:**
+
 - Сегменты появляются по мере обработки
 - Можно уже начинать назначать спикеров не дожидаясь конца
 - Отменить транскрипцию — крестик рядом с прогрессбаром
@@ -227,6 +240,7 @@ Whisper работает, сегменты стримятся в реально�
 ```
 
 **Speaker picker (on click):**
+
 ```
   [Rustam        ]
   [Anton         ]
@@ -236,6 +250,7 @@ Whisper работает, сегменты стримятся в реально�
 ```
 
 **Export options:**
+
 - "Export this file" → MD или TXT
 - "Merge & Export" → выбираешь какие сессии объединить → MD или TXT
 
@@ -282,14 +297,16 @@ Electron Renderer Process (React + Mantine)
 ```
 
 ### whisper.cpp integration
+
 - Binary bundled in `resources/whisper.cpp/`
 - Spawned with args: `--model <path> --language auto --output-txt <file>`
 - Segments parsed from stdout as they arrive → pushed to renderer via IPC
 
 ### Storage
-- Sessions: `~/Library/Application Support/scribe-my-bitch-up/sessions/<id>.json`
-- Speakers: `~/Library/Application Support/scribe-my-bitch-up/speakers.json`
-- Models: `~/Library/Application Support/scribe-my-bitch-up/models/`
+
+- Sessions: `~/Library/Application Support/Gimme Transcript/sessions/<id>.json`
+- Speakers: `~/Library/Application Support/Gimme Transcript/speakers.json`
+- Models: `~/Library/Application Support/Gimme Transcript/models/`
 - Default storage path configurable in Settings
 
 ---
@@ -319,24 +336,24 @@ Electron Renderer Process (React + Mantine)
 
 ## MVP Scope
 
-| Feature | MVP |
-|---|---|
-| Audio import (drag & drop + file picker) | ✅ |
-| whisper.cpp transcription (local) | ✅ |
-| Real-time segment streaming | ✅ |
-| Model selection + auto-download | ✅ |
-| Manual speaker labeling | ✅ |
-| Global speaker database | ✅ |
-| Bulk speaker assign | ✅ |
-| Export per file (MD, TXT) | ✅ |
-| Merge files → export as one meeting | ✅ |
-| JSON session storage | ✅ |
-| Configurable storage path | ✅ |
-| Language auto-detect (override in settings) | ✅ |
-| Segment merge/split | ❌ v2 |
-| Auto diarization (pyannote) | ❌ v2 |
-| Export to SRT/VTT | ❌ v2 |
-| Windows support | ❌ v2 |
+| Feature                                     | MVP   |
+| ------------------------------------------- | ----- |
+| Audio import (drag & drop + file picker)    | ✅    |
+| whisper.cpp transcription (local)           | ✅    |
+| Real-time segment streaming                 | ✅    |
+| Model selection + auto-download             | ✅    |
+| Manual speaker labeling                     | ✅    |
+| Global speaker database                     | ✅    |
+| Bulk speaker assign                         | ✅    |
+| Export per file (MD, TXT)                   | ✅    |
+| Merge files → export as one meeting         | ✅    |
+| JSON session storage                        | ✅    |
+| Configurable storage path                   | ✅    |
+| Language auto-detect (override in settings) | ✅    |
+| Segment merge/split                         | ❌ v2 |
+| Auto diarization (pyannote)                 | ❌ v2 |
+| Export to SRT/VTT                           | ❌ v2 |
+| Windows support                             | ❌ v2 |
 
 ---
 

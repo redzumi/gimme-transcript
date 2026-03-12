@@ -1,4 +1,4 @@
-# scribe-my-bitch-up — Task Breakdown
+# Gimme Transcript — Task Breakdown
 
 Атомарные задачи для агентов. Каждая задача независима и имеет чёткий результат.
 Порядок важен внутри фаз — между фазами можно параллелить.
@@ -17,7 +17,7 @@
 
 ## Phase 1: Storage Layer
 
-- [x] **T-010** Implement AppData path resolution (macOS: `~/Library/Application Support/scribe-my-bitch-up/`)
+- [x] **T-010** Implement AppData path resolution (macOS: `~/Library/Application Support/Gimme Transcript/`)
 - [x] **T-011** Implement session storage (CRUD for session JSON files)
 - [x] **T-012** Implement speaker database (`speakers.json` — CRUD)
 - [x] **T-013** Implement settings storage (`settings.json` — model, language, storage path)

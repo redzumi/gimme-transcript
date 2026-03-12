@@ -5,8 +5,10 @@ import icon from '../../resources/icon.png?asset'
 import { registerHandlers } from './ipc'
 import { getSettings, applyStoragePath } from './storage'
 
-if (process.env.SMBU_USER_DATA_DIR) {
-  app.setPath('userData', process.env.SMBU_USER_DATA_DIR)
+app.setName('Gimme Transcript')
+
+if (process.env.GIMME_TRANSCRIPT_USER_DATA_DIR) {
+  app.setPath('userData', process.env.GIMME_TRANSCRIPT_USER_DATA_DIR)
 }
 
 function createWindow(): void {
@@ -42,7 +44,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.scribe-my-bitch-up.app')
+  electronApp.setAppUserModelId('com.gimmetranscript.app')
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)

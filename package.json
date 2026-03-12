@@ -1,17 +1,17 @@
 {
-  "name": "scribe-my-bitch-up",
+  "name": "gimme-transcript",
   "version": "1.1.9",
   "description": "Local desktop transcription for multi-speaker audio using whisper.cpp.",
   "main": "./out/main/index.js",
   "author": "redzumi",
   "license": "MIT",
-  "homepage": "https://github.com/redzumi/scribe-my-bitch-up",
+  "homepage": "https://github.com/redzumi/gimme-transcript",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/redzumi/scribe-my-bitch-up.git"
+    "url": "git+https://github.com/redzumi/gimme-transcript.git"
   },
   "bugs": {
-    "url": "https://github.com/redzumi/scribe-my-bitch-up/issues"
+    "url": "https://github.com/redzumi/gimme-transcript/issues"
   },
   "keywords": [
     "electron",

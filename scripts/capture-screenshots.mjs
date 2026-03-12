@@ -131,7 +131,7 @@ async function launchApp(userDataDir) {
     args: [outMainEntry],
     env: {
       ...process.env,
-      SMBU_USER_DATA_DIR: userDataDir,
+      GIMME_TRANSCRIPT_USER_DATA_DIR: userDataDir,
       NODE_ENV: 'production'
     }
   })
@@ -149,7 +149,7 @@ async function setWindowSize(app, bounds) {
 }
 
 async function captureFirstLaunch(outputPath) {
-  const userDataDir = await mkdtemp(join(tmpdir(), 'smbu-shot-first-'))
+  const userDataDir = await mkdtemp(join(tmpdir(), 'gimme-transcript-shot-first-'))
   try {
     await seedFixture(userDataDir, { withModels: false })
     const { app, page } = await launchApp(userDataDir)
@@ -166,7 +166,7 @@ async function captureFirstLaunch(outputPath) {
 }
 
 async function captureMainScreens(outputPaths) {
-  const userDataDir = await mkdtemp(join(tmpdir(), 'smbu-shot-main-'))
+  const userDataDir = await mkdtemp(join(tmpdir(), 'gimme-transcript-shot-main-'))
   try {
     await seedFixture(userDataDir, { withModels: true })
     const { app, page } = await launchApp(userDataDir)

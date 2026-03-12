@@ -11,7 +11,7 @@ export function Logo({ size = 28, className = '' }: LogoProps): React.JSX.Elemen
   return (
     <img
       src={logoSvg}
-      alt="SMBU logo"
+      alt="Gimme Transcript logo"
       width={width}
       height={size}
       className={`object-cover object-center shrink-0 ${className}`.trim()}

@@ -1,10 +1,10 @@
-# Scribe My Bitch Up
+# Gimme Transcript
 
-<img src="./docs/branding/logo-variants/logo.png" alt="SMBU logo" width="220" />
+<img src="./docs/branding/logo-variants/logo.png" alt="Gimme Transcript logo" width="220" />
 
 ## Local desktop transcription for multi-speaker audio. No cloud, no API keys, no data leaves your machine.
 
-`scribe-my-bitch-up` is an Electron app built around `whisper.cpp`:
+`Gimme Transcript` is an Electron app built around `whisper.cpp`:
 
 - import one or more audio files
 - transcribe locally with Whisper models
@@ -110,7 +110,7 @@ Default locations:
 On macOS, the default app data base path is:
 
 ```text
-~/Library/Application Support/scribe-my-bitch-up/
+~/Library/Application Support/Gimme Transcript/
 ```
 
 The app also supports overriding the storage path in settings.
