@@ -4,6 +4,7 @@ export type WhisperModel = 'tiny' | 'base' | 'small' | 'medium' | 'large'
 
 export interface Session {
   id: string
+  name?: string
   createdAt: string
   audioFile: string
   model: WhisperModel
