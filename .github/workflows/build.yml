@@ -25,12 +25,17 @@ jobs:
 
       - name: Install dependencies (Unix)
         if: matrix.os != 'windows-latest'
-        run: npm install || (rm -rf node_modules package-lock.json && npm install)
+        run: npm install --include=optional || (rm -rf node_modules package-lock.json && npm install --include=optional)
 
       - name: Install dependencies (Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
-        run: npm install || (Remove-Item -Recurse -Force node_modules, package-lock.json -ErrorAction SilentlyContinue; npm install)
+        run: |
+          npm install --include=optional
+          if ($LASTEXITCODE -ne 0) {
+            Remove-Item -Recurse -Force node_modules, package-lock.json -ErrorAction SilentlyContinue
+            npm install --include=optional
+          }
 
       - name: build-linux
         if: matrix.os == 'ubuntu-latest'
