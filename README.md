@@ -1,8 +1,8 @@
-# scribe-my-bitch-up
+# Scribe My Bitch Up
 
 <img src="./docs/branding/logo-variants/logo.png" alt="SMBU logo" width="220" />
 
-Local desktop transcription for multi-speaker audio. No cloud, no API keys, no data leaves your machine.
+## Local desktop transcription for multi-speaker audio. No cloud, no API keys, no data leaves your machine.
 
 `scribe-my-bitch-up` is an Electron app built around `whisper.cpp`:
 
@@ -12,15 +12,6 @@ Local desktop transcription for multi-speaker audio. No cloud, no API keys, no d
 - export clean transcripts as Markdown or plain text
 
 The project is macOS-first for MVP. Linux and Windows build configs exist in the repo, but they are not the primary supported targets yet.
-
-The current branding source lives in [docs/branding/logo-variants/logo.svg](./docs/branding/logo-variants/logo.svg).
-
-## Screenshots
-
-<img src="./docs/screenshots/first-launch.png" alt="First launch screen" width="49%" />
-<img src="./docs/screenshots/home.png" alt="Home screen" width="49%" />
-<img src="./docs/screenshots/session.png" alt="Session screen" width="49%" />
-<img src="./docs/screenshots/settings.png" alt="Settings screen" width="49%" />
 
 ## Why this exists
 
@@ -42,6 +33,13 @@ Most tools that handle multi-speaker meeting transcripts well are paid, cloud-ba
 - downloadable Whisper models from inside the app
 - custom storage path support
 
+## Screenshots
+
+<img src="./docs/screenshots/first-launch.png" alt="First launch screen" width="49%" />
+<img src="./docs/screenshots/home.png" alt="Home screen" width="49%" />
+<img src="./docs/screenshots/session.png" alt="Session screen" width="49%" />
+<img src="./docs/screenshots/settings.png" alt="Settings screen" width="49%" />
+
 ## Tech Stack
 
 - Electron
@@ -52,18 +50,11 @@ Most tools that handle multi-speaker meeting transcripts well are paid, cloud-ba
 - TypeScript (`strict`)
 - `whisper.cpp`
 
-## Supported Audio Formats
-
-- `.mp3`
-- `.m4a`
-- `.wav`
-- `.ogg`
-
 ## Project Status
 
 MVP is implemented according to the current task list in [tasks.md](./tasks.md). The app is still early-stage and should be treated as a fast-moving desktop project rather than a stable end-user release.
 
-## Getting Started
+## Development
 
 ### Prerequisites
 
@@ -99,6 +90,12 @@ npm run build
 npm run build:mac
 ```
 
+### Regenerate screenshots
+
+```bash
+npm run screenshots
+```
+
 ## Whisper Models
 
 The app downloads Whisper models into the app data directory on first use.
@@ -129,8 +126,11 @@ resources/
   whisper.cpp/ bundled binaries
 scripts/
   build-whisper.mjs
+  capture-screenshots.mjs
 docs/branding/
   logo-variants/ final selected branding assets
+docs/screenshots/
+  real Playwright-driven app screenshots used in the README
 ```
 
 ## Contributing
