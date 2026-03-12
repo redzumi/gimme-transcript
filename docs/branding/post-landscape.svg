@@ -1,0 +1,67 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="lsBg" x1="124" y1="92" x2="1428" y2="812" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFF5E9"/>
+      <stop offset="50%" stop-color="#FFDDB8"/>
+      <stop offset="100%" stop-color="#FDBA74"/>
+    </linearGradient>
+    <linearGradient id="lsAccent" x1="162" y1="164" x2="684" y2="676" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FB923C"/>
+      <stop offset="100%" stop-color="#C2410C"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1600" height="900" rx="44" fill="#101010"/>
+  <rect x="24" y="24" width="1552" height="852" rx="30" fill="url(#lsBg)"/>
+
+  <circle cx="1348" cy="188" r="170" fill="#FFFFFF" fill-opacity="0.22"/>
+  <circle cx="1456" cy="736" r="220" fill="#7C2D12" fill-opacity="0.08"/>
+  <circle cx="182" cy="770" r="190" fill="#FFFFFF" fill-opacity="0.12"/>
+
+  <rect x="96" y="112" width="600" height="676" rx="46" fill="#FFFDF8"/>
+  <rect x="132" y="148" width="528" height="604" rx="38" fill="url(#lsAccent)"/>
+
+  <path d="M206 320C240.667 274 275.333 274 310 320C344.667 366 379.333 366 414 320C448.667 274 483.333 274 518 320" stroke="white" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M564 320H598H628" stroke="white" stroke-width="28" stroke-linecap="round"/>
+  <path d="M206 432H628" stroke="white" stroke-width="28" stroke-linecap="round"/>
+  <path d="M206 548H512" stroke="white" stroke-width="28" stroke-linecap="round"/>
+
+  <rect x="206" y="622" width="206" height="64" rx="32" fill="#FFF7ED" fill-opacity="0.22" stroke="#FFFFFF" stroke-opacity="0.5" stroke-width="2"/>
+  <text x="246" y="663" fill="#FFFDF8" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="28" font-weight="700">
+    local-only
+  </text>
+
+  <rect x="428" y="622" width="166" height="64" rx="32" fill="#FFF7ED" fill-opacity="0.22" stroke="#FFFFFF" stroke-opacity="0.5" stroke-width="2"/>
+  <text x="466" y="663" fill="#FFFDF8" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="28" font-weight="700">
+    export
+  </text>
+
+  <text x="768" y="254" fill="#111111" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="112" font-weight="700" letter-spacing="-3">
+    scribe-my-
+  </text>
+  <text x="768" y="364" fill="#111111" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="112" font-weight="700" letter-spacing="-3">
+    bitch-up
+  </text>
+
+  <text x="768" y="458" fill="#3F3F46" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="44" font-weight="500">
+    Multi-speaker transcription without sending audio
+  </text>
+  <text x="768" y="516" fill="#3F3F46" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="44" font-weight="500">
+    to the cloud. Built on top of whisper.cpp.
+  </text>
+
+  <rect x="768" y="586" width="250" height="70" rx="35" fill="#111111"/>
+  <text x="812" y="631" fill="#FFF8EF" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="31" font-weight="700">
+    no API keys
+  </text>
+
+  <rect x="1038" y="586" width="280" height="70" rx="35" fill="#111111"/>
+  <text x="1076" y="631" fill="#FFF8EF" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="31" font-weight="700">
+    streamed segments
+  </text>
+
+  <rect x="768" y="698" width="580" height="108" rx="30" fill="#FFFDF8" fill-opacity="0.78"/>
+  <text x="812" y="760" fill="#57534E" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="36" font-weight="600">
+    Label speakers manually. Export clean transcripts.
+  </text>
+</svg>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Text, Button, Group, Progress, ScrollArea, Select, Modal, Checkbox } from '@mantine/core'
 import type { Session, Segment, Speaker, WhisperModel } from '../types/ipc'
 
@@ -13,7 +13,6 @@ function formatTime(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
-// Per-speaker color palette (light backgrounds)
 const SPEAKER_COLORS = [
   { pill: 'bg-blue-100 text-blue-700', bar: 'bg-blue-50 border-l-2 border-blue-300' },
   { pill: 'bg-emerald-100 text-emerald-700', bar: 'bg-emerald-50 border-l-2 border-emerald-300' },
@@ -25,6 +24,7 @@ const SPEAKER_COLORS = [
   { pill: 'bg-rose-100 text-rose-700', bar: 'bg-rose-50 border-l-2 border-rose-300' },
 ]
 
+
 export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.Element {
   const [session, setSession] = useState<Session | null>(null)
   const [speakers, setSpeakers] = useState<Speaker[]>([])
@@ -32,8 +32,13 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
   const [progress, setProgress] = useState(0)
   const [anchorIdx, setAnchorIdx] = useState<number | null>(null)
   const [focusIdx, setFocusIdx] = useState<number | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const didDragRef = useRef(false)
   const [mergeOpen, setMergeOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [segCtxMenu, setSegCtxMenu] = useState<{ x: number; y: number } | null>(null)
+  const [newSpeakerName, setNewSpeakerName] = useState('')
+  const newSpeakerInputRef = useRef<HTMLInputElement>(null)
 
   const reload = useCallback(async () => {
     const [s, sp, modelList] = await Promise.all([
@@ -75,14 +80,19 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
     }
   }, [sessionId, reload])
 
-  // speakerId → color index
+  // Stop drag on mouseup anywhere
+  useEffect(() => {
+    const stop = (): void => setIsDragging(false)
+    window.addEventListener('mouseup', stop)
+    return () => window.removeEventListener('mouseup', stop)
+  }, [])
+
   const speakerColorMap = useMemo(() => {
     const map = new Map<string, number>()
     speakers.forEach((sp, i) => map.set(sp.id, i))
     return map
   }, [speakers])
 
-  // Range selection → set of segment IDs
   const selectedIds = useMemo((): Set<string> => {
     if (!session || anchorIdx === null) return new Set()
     const fi = focusIdx ?? anchorIdx
@@ -91,7 +101,31 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
     return new Set(session.segments.slice(from, to + 1).map((s) => s.id))
   }, [anchorIdx, focusIdx, session])
 
+  function handleSegmentMouseDown(e: React.MouseEvent, idx: number): void {
+    if (e.button !== 0) return // только ЛКМ
+    e.preventDefault()
+    didDragRef.current = false
+    setIsDragging(true)
+    // Shift: расширяем от текущего anchor, не двигаем его
+    if (!e.shiftKey) {
+      setAnchorIdx(idx)
+    }
+    setFocusIdx(idx)
+  }
+
+  function handleSegmentMouseEnter(idx: number): void {
+    if (isDragging) {
+      didDragRef.current = true
+      setFocusIdx(idx)
+    }
+  }
+
   function handleSegmentClick(idx: number, shiftKey: boolean): void {
+    // Если был реальный drag — click не должен сбрасывать выделение
+    if (didDragRef.current) {
+      didDragRef.current = false
+      return
+    }
     if (shiftKey && anchorIdx !== null) {
       setFocusIdx(idx)
     } else {
@@ -117,7 +151,26 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
     reload()
   }
 
-  async function handleAssignSelected(speakerId: string): Promise<void> {
+  async function handleMergeSelected(): Promise<void> {
+    if (!session || selectedIds.size < 2) return
+    setSegCtxMenu(null)
+    const ordered = session.segments.filter((seg) => selectedIds.has(seg.id))
+    const merged: Segment = {
+      id: ordered[0].id,
+      start: ordered[0].start,
+      end: ordered[ordered.length - 1].end,
+      text: ordered.map((s) => s.text.trim()).join(' '),
+      speakerId: ordered[0].speakerId,
+    }
+    const segments = session.segments
+      .filter((seg) => !selectedIds.has(seg.id) || seg.id === ordered[0].id)
+      .map((seg) => (seg.id === ordered[0].id ? merged : seg))
+    const updated = await window.api.invoke('sessions:update', sessionId, { segments })
+    setSession(updated)
+    clearSelection()
+  }
+
+  async function handleAssignSelected(speakerId: string | null): Promise<void> {
     if (!session || selectedIds.size === 0) return
     const segments = session.segments.map((seg) =>
       selectedIds.has(seg.id) ? { ...seg, speakerId } : seg
@@ -131,6 +184,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
     if (!session) return
     const sp = await window.api.invoke('speakers:create', name)
     setSpeakers((prev) => [...prev, sp])
+    setNewSpeakerName('')
     if (selectedIds.size === 0) return
     const segments = session.segments.map((seg) =>
       selectedIds.has(seg.id) ? { ...seg, speakerId: sp.id } : seg
@@ -142,16 +196,46 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
 
   if (!session) return <div className="h-screen bg-white" />
 
-  const fileName = session.audioFile.split('/').pop() ?? session.audioFile
+  const sessionName = session.name ?? session.audioFile.split('/').pop() ?? session.audioFile
   const showTranscript = session.status === 'transcribing' || session.status === 'done'
 
   return (
     <div
       className="flex flex-col h-screen bg-white"
       onClick={(e) => {
-        if (!(e.target as Element).closest('[data-segment]')) clearSelection()
+        // Поглощаем клик после drag — выделение не сбрасываем
+        if (didDragRef.current) {
+          didDragRef.current = false
+          return
+        }
+        if (!(e.target as Element).closest('[data-segment]') &&
+            !(e.target as Element).closest('[data-sidebar]')) {
+          clearSelection()
+        }
+        setSegCtxMenu(null)
       }}
     >
+      {/* Segment context menu */}
+      {segCtxMenu && (
+        <div
+          className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[160px]"
+          style={{ top: segCtxMenu.y, left: segCtxMenu.x }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2 ${
+              selectedIds.size >= 2
+                ? 'text-gray-700 hover:bg-gray-50'
+                : 'text-gray-300 cursor-default'
+            }`}
+            disabled={selectedIds.size < 2}
+            onClick={handleMergeSelected}
+          >
+            Merge {selectedIds.size >= 2 ? `${selectedIds.size} segments` : 'segments'}
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center gap-2 px-4 h-11 border-b border-gray-200 shrink-0">
         <button
@@ -161,7 +245,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
           ← Home
         </button>
         <div className="w-px h-3.5 bg-gray-200" />
-        <span className="text-sm text-gray-700 font-medium truncate flex-1">{fileName}</span>
+        <span className="text-sm text-gray-700 font-medium truncate flex-1">{sessionName}</span>
         {session.status === 'done' && (
           <Group gap="xs">
             <ExportButton session={session} speakers={speakers} />
@@ -205,7 +289,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
             <p className="text-xs text-gray-400 uppercase tracking-widest font-medium mb-2">
               Ready to transcribe
             </p>
-            <p className="text-base font-semibold text-gray-800">{fileName}</p>
+            <p className="text-base font-semibold text-gray-800">{sessionName}</p>
           </div>
           {downloadedModels.length === 0 ? (
             <p className="text-xs text-amber-600 text-center max-w-xs">
@@ -257,78 +341,159 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
         </div>
       )}
 
-      {/* Transcript */}
+      {/* Transcript + sidebar */}
       {showTranscript && (
-        <ScrollArea className="flex-1">
-          <div className="py-6">
-            {session.segments.length === 0 && session.status === 'transcribing' && (
-              <div className="flex items-center justify-center h-20">
-                <Text size="sm" c="dimmed">
-                  Waiting for first segment…
-                </Text>
-              </div>
-            )}
-
-            {session.segments.map((seg, idx) => {
-              const speaker = speakers.find((s) => s.id === seg.speakerId)
-              const colorIdx = speaker ? (speakerColorMap.get(speaker.id) ?? 0) : -1
-              const colors = colorIdx >= 0 ? SPEAKER_COLORS[colorIdx % SPEAKER_COLORS.length] : null
-              const isSelected = selectedIds.has(seg.id)
-
-              return (
-                <div
-                  key={seg.id}
-                  data-segment
-                  className={`flex gap-0 px-10 py-2 cursor-pointer select-none transition-colors ${
-                    isSelected ? 'bg-orange-50' : 'hover:bg-gray-50'
-                  }`}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleSegmentClick(idx, e.shiftKey)
-                  }}
-                >
-                  {/* Left: speaker + timestamp */}
-                  <div className="w-32 shrink-0 flex flex-col items-end gap-0.5 pr-4 pt-0.5">
-                    {speaker ? (
-                      <span
-                        className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${colors?.pill ?? ''}`}
-                      >
-                        {speaker.name}
-                      </span>
-                    ) : (
-                      <span className="text-[11px] text-gray-300 font-medium">—</span>
-                    )}
-                    <span className="text-[10px] font-mono text-gray-300">
-                      {formatTime(seg.start)}
-                    </span>
-                  </div>
-
-                  {/* Right: text */}
-                  <p className="flex-1 text-sm text-gray-800 leading-relaxed m-0">
-                    {seg.text.trim()}
-                  </p>
+        <div className="flex flex-1 overflow-hidden">
+          {/* Transcript */}
+          <ScrollArea className="flex-1">
+            <div className="py-6" style={{ userSelect: 'none' }}>
+              {session.segments.length === 0 && session.status === 'transcribing' && (
+                <div className="flex items-center justify-center h-20">
+                  <Text size="sm" c="dimmed">Waiting for first segment…</Text>
                 </div>
-              )
-            })}
+              )}
 
-            {session.status === 'transcribing' && session.segments.length > 0 && (
-              <div className="px-10 py-2 flex justify-end pr-[calc(100%-8rem+1rem)] pl-[8.5rem]">
-                <span className="inline-block w-0.5 h-4 bg-orange-400 animate-pulse rounded" />
-              </div>
-            )}
+              {session.segments.map((seg, idx) => {
+                const speaker = speakers.find((s) => s.id === seg.speakerId)
+                const colorIdx = speaker ? (speakerColorMap.get(speaker.id) ?? 0) : -1
+                const colors = colorIdx >= 0 ? SPEAKER_COLORS[colorIdx % SPEAKER_COLORS.length] : null
+                const isSelected = selectedIds.has(seg.id)
+
+                return (
+                  <div
+                    key={seg.id}
+                    data-segment
+                    className={`flex gap-0 px-10 py-2 cursor-pointer transition-colors ${
+                      isSelected ? 'bg-orange-50' : 'hover:bg-gray-50'
+                    }`}
+                    onMouseDown={(e) => handleSegmentMouseDown(e, idx)}
+                    onMouseEnter={() => handleSegmentMouseEnter(idx)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setSegCtxMenu(null)
+                      handleSegmentClick(idx, e.shiftKey)
+                    }}
+                    onContextMenu={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setSegCtxMenu({ x: e.clientX, y: e.clientY })
+                    }}
+                  >
+                    {/* Left: speaker + timestamp */}
+                    <div className="w-32 shrink-0 flex flex-col items-end gap-0.5 pr-4 pt-0.5">
+                      {speaker ? (
+                        <span
+                          className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${colors?.pill ?? ''}`}
+                        >
+                          {speaker.name}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-gray-300 font-medium">—</span>
+                      )}
+                      {seg.start > 0 && (
+                        <span className="text-[10px] font-mono text-gray-300">
+                          {formatTime(seg.start)}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Right: text */}
+                    <p className="flex-1 text-sm text-gray-800 leading-relaxed m-0">
+                      {seg.text.trim()}
+                    </p>
+                  </div>
+                )
+              })}
+
+              {session.status === 'transcribing' && session.segments.length > 0 && (
+                <div className="px-10 py-2 pl-[8.5rem]">
+                  <span className="inline-block w-0.5 h-4 bg-orange-400 animate-pulse rounded" />
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+
+          {/* Speakers sidebar */}
+          <div
+            data-sidebar
+            className="w-44 shrink-0 border-l border-gray-200 flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Sticky header */}
+            <div className="sticky top-0 bg-white px-3 py-2.5 border-b border-gray-100 z-10">
+              {selectedIds.size > 0 ? (
+                <div className="flex items-center justify-between">
+                  <Text size="xs" fw={600} c="orange">
+                    {selectedIds.size} {selectedIds.size === 1 ? 'segment' : 'segments'}
+                  </Text>
+                  <button
+                    className="text-[10px] text-gray-400 hover:text-gray-700 transition-colors"
+                    onClick={clearSelection}
+                  >
+                    clear
+                  </button>
+                </div>
+              ) : (
+                <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.06em' }}>
+                  Speakers
+                </Text>
+              )}
+            </div>
+
+            {/* Speaker list */}
+            <div className="flex-1 overflow-y-auto px-3 py-2 flex flex-col gap-1">
+              <button
+                className={`text-xs px-3 py-2 rounded-lg text-left font-medium transition-colors ${
+                  selectedIds.size > 0
+                    ? 'text-gray-400 bg-gray-100 hover:bg-red-50 hover:text-red-400 cursor-pointer'
+                    : 'text-gray-300 bg-gray-50 cursor-default opacity-60'
+                }`}
+                disabled={selectedIds.size === 0}
+                onClick={() => handleAssignSelected(null)}
+              >
+                — none
+              </button>
+              {speakers.length === 0 && (
+                <Text size="xs" c="dimmed" ta="center" mt="lg">
+                  No speakers yet
+                </Text>
+              )}
+              {speakers.map((sp) => {
+                const colorIdx = speakerColorMap.get(sp.id) ?? 0
+                const colors = SPEAKER_COLORS[colorIdx % SPEAKER_COLORS.length]
+                return (
+                  <button
+                    key={sp.id}
+                    className={`text-xs px-3 py-2 rounded-lg text-left font-medium transition-colors ${
+                      selectedIds.size > 0
+                        ? `${colors.pill} hover:opacity-80 cursor-pointer`
+                        : 'text-gray-600 bg-gray-50 cursor-default opacity-60'
+                    }`}
+                    disabled={selectedIds.size === 0}
+                    onClick={() => handleAssignSelected(sp.id)}
+                  >
+                    {sp.name}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* New speaker input */}
+            <div className="px-3 pb-3 pt-1 border-t border-gray-100">
+              <input
+                ref={newSpeakerInputRef}
+                className="text-xs px-2.5 py-1.5 w-full bg-gray-50 rounded-lg outline-none placeholder-gray-400 text-gray-700 focus:bg-orange-50 focus:placeholder-orange-300 transition-colors border border-transparent focus:border-orange-200"
+                placeholder="+ new speaker"
+                value={newSpeakerName}
+                onChange={(e) => setNewSpeakerName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCreateAndAssign(newSpeakerName.trim())
+                  if (e.key === 'Escape') setNewSpeakerName('')
+                }}
+              />
+            </div>
           </div>
-        </ScrollArea>
-      )}
-
-      {/* Assignment bar — shown when segments are selected */}
-      {selectedIds.size > 0 && (
-        <AssignBar
-          count={selectedIds.size}
-          speakers={speakers}
-          onAssign={handleAssignSelected}
-          onCreateAndAssign={handleCreateAndAssign}
-          onClear={clearSelection}
-        />
+        </div>
       )}
 
       <MergeExportModal
@@ -337,66 +502,6 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
         currentSessionId={sessionId}
         speakers={speakers}
       />
-    </div>
-  )
-}
-
-// ─── AssignBar ────────────────────────────────────────────────────────────────
-
-interface AssignBarProps {
-  count: number
-  speakers: Speaker[]
-  onAssign: (speakerId: string) => void
-  onCreateAndAssign: (name: string) => Promise<void>
-  onClear: () => void
-}
-
-function AssignBar({ count, speakers, onAssign, onCreateAndAssign, onClear }: AssignBarProps): React.JSX.Element {
-  const [newName, setNewName] = useState('')
-
-  async function handleCreate(): Promise<void> {
-    const name = newName.trim()
-    if (!name) return
-    setNewName('')
-    await onCreateAndAssign(name)
-  }
-
-  return (
-    <div
-      className="flex items-center gap-3 px-4 py-2.5 bg-white border-t border-gray-200 shadow-[0_-2px_12px_rgba(0,0,0,0.06)] shrink-0"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <Text size="xs" c="dimmed" className="shrink-0">
-        {count} {count === 1 ? 'segment' : 'segments'}
-      </Text>
-      <div className="w-px h-3.5 bg-gray-200 shrink-0" />
-      <div className="flex items-center flex-wrap gap-1.5 flex-1">
-        {speakers.map((sp) => (
-          <button
-            key={sp.id}
-            className="text-xs px-3 py-1 bg-gray-100 hover:bg-orange-100 hover:text-orange-700 text-gray-700 rounded-full transition-colors font-medium whitespace-nowrap"
-            onClick={() => onAssign(sp.id)}
-          >
-            {sp.name}
-          </button>
-        ))}
-        <input
-          className="text-xs px-3 py-1 bg-gray-100 rounded-full outline-none placeholder-gray-400 text-gray-700 min-w-0 w-32 focus:bg-orange-50 focus:placeholder-orange-300 transition-colors"
-          placeholder="+ new speaker"
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handleCreate()
-            if (e.key === 'Escape') onClear()
-          }}
-        />
-      </div>
-      <button
-        className="text-xs text-gray-400 hover:text-gray-700 px-1 transition-colors shrink-0"
-        onClick={onClear}
-      >
-        ✕
-      </button>
     </div>
   )
 }
@@ -415,7 +520,8 @@ function ExportButton({ session, speakers }: ExportButtonProps): React.JSX.Eleme
     const lines: string[] = []
     for (const seg of session.segments) {
       const sp = speakers.find((s) => s.id === seg.speakerId)
-      lines.push(`**${sp?.name ?? 'Unknown'}** [${formatTime(seg.start)}]`)
+      const time = seg.start > 0 ? ` [${formatTime(seg.start)}]` : ''
+      lines.push(`**${sp?.name ?? 'Unknown'}**${time}`)
       lines.push(seg.text.trim())
       lines.push('')
     }
@@ -426,14 +532,15 @@ function ExportButton({ session, speakers }: ExportButtonProps): React.JSX.Eleme
     return session.segments
       .map((seg) => {
         const sp = speakers.find((s) => s.id === seg.speakerId)
-        return `[${formatTime(seg.start)}] ${sp?.name ?? 'Unknown'}: ${seg.text.trim()}`
+        const time = seg.start > 0 ? `[${formatTime(seg.start)}] ` : ''
+        return `${time}${sp?.name ?? 'Unknown'}: ${seg.text.trim()}`
       })
       .join('\n')
   }
 
   async function handleExport(format: 'md' | 'txt'): Promise<void> {
     setOpen(false)
-    const base = session.audioFile.split('/').pop()?.replace(/\.[^.]+$/, '') ?? 'transcript'
+    const base = (session.name ?? session.audioFile.split('/').pop()?.replace(/\.[^.]+$/, '')) ?? 'transcript'
     const savePath = await window.api.invoke('dialog:save', `${base}.${format}`)
     if (!savePath) return
     await window.api.invoke('export:write', savePath, format === 'md' ? buildMd() : buildTxt())
@@ -508,7 +615,8 @@ function MergeExportModal({
     const lines: string[] = []
     for (const seg of mergedSegments()) {
       const sp = speakers.find((s) => s.id === seg.speakerId)
-      lines.push(`**${sp?.name ?? 'Unknown'}** [${formatTime(seg.start)}]`)
+      const time = seg.start > 0 ? ` [${formatTime(seg.start)}]` : ''
+      lines.push(`**${sp?.name ?? 'Unknown'}**${time}`)
       lines.push(seg.text.trim())
       lines.push('')
     }
@@ -519,7 +627,8 @@ function MergeExportModal({
     return mergedSegments()
       .map((seg) => {
         const sp = speakers.find((s) => s.id === seg.speakerId)
-        return `[${formatTime(seg.start)}] ${sp?.name ?? 'Unknown'}: ${seg.text.trim()}`
+        const time = seg.start > 0 ? `[${formatTime(seg.start)}] ` : ''
+        return `${time}${sp?.name ?? 'Unknown'}: ${seg.text.trim()}`
       })
       .join('\n')
   }
@@ -543,7 +652,7 @@ function MergeExportModal({
             checked={checkedIds.has(s.id)}
             onChange={() => toggle(s.id)}
             label={
-              <Text size="sm">{s.audioFile.split('/').pop() ?? s.audioFile}</Text>
+              <Text size="sm">{s.name ?? s.audioFile.split('/').pop() ?? s.audioFile}</Text>
             }
           />
         ))}

@@ -1,7 +1,13 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Text, Button, Group, ActionIcon, TextInput, Select, ScrollArea } from '@mantine/core'
 import type { Session, Speaker, WhisperModel } from '../types/ipc'
 import { Logo } from '../components/Logo'
+
+interface ContextMenu {
+  sessionId: string
+  x: number
+  y: number
+}
 
 interface Props {
   onOpenSession: (id: string) => void
@@ -32,6 +38,10 @@ const STATUS_LABEL: Record<string, string> = {
   labeled: 'labeled',
 }
 
+function getSessionName(s: Session): string {
+  return s.name ?? s.audioFile.split('/').pop() ?? s.audioFile
+}
+
 export default function Home({ onOpenSession, onOpenSettings }: Props): React.JSX.Element {
   const [sessions, setSessions] = useState<Session[]>([])
   const [speakers, setSpeakers] = useState<Speaker[]>([])
@@ -39,6 +49,12 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
   const [downloadedModels, setDownloadedModels] = useState<WhisperModel[]>([])
   const [newSpeakerName, setNewSpeakerName] = useState('')
   const [addingSpeaker, setAddingSpeaker] = useState(false)
+  const [search, setSearch] = useState('')
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null)
+  const [sessionProgress, setSessionProgress] = useState<Map<string, number>>(new Map())
+  const renameInputRef = useRef<HTMLInputElement>(null)
 
   const reload = useCallback(async () => {
     const [s, sp, settings, modelList] = await Promise.all([
@@ -55,7 +71,31 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
 
   useEffect(() => {
     reload()
+
+    const offProgress = window.api.on('whisper:progress', ({ sessionId, percent }) => {
+      setSessionProgress((prev) => new Map(prev).set(sessionId, percent))
+    })
+    const offDone = window.api.on('whisper:done', ({ sessionId }) => {
+      setSessionProgress((prev) => {
+        const next = new Map(prev)
+        next.delete(sessionId)
+        return next
+      })
+      reload()
+    })
+
+    return () => {
+      offProgress()
+      offDone()
+    }
   }, [reload])
+
+  useEffect(() => {
+    if (renamingId && renameInputRef.current) {
+      renameInputRef.current.focus()
+      renameInputRef.current.select()
+    }
+  }, [renamingId])
 
   async function handleNewSession(): Promise<void> {
     const files = await window.api.invoke('dialog:open-audio')
@@ -63,6 +103,62 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
     for (const file of files) {
       await window.api.invoke('sessions:create', file, currentModel, 'auto')
     }
+    reload()
+  }
+
+  async function handleImportText(): Promise<void> {
+    const result = await window.api.invoke('dialog:open-text')
+    if (!result) return
+    const { path, content } = result
+    const blocks = content.includes('\n\n')
+      ? content.split(/\n\n+/)
+      : content.split(/\n/)
+    const segments = blocks
+      .map((b) => b.trim())
+      .filter((b) => b.length > 0)
+      .map((b, i) => ({
+        id: `imported-${i}-${Math.random().toString(36).slice(2)}`,
+        start: 0,
+        end: 0,
+        text: b,
+        speakerId: null,
+      }))
+    const firstWords = segments[0]?.text.slice(0, 40) ?? 'Imported text'
+    const name = firstWords.length < (segments[0]?.text.length ?? 0) ? firstWords + '…' : firstWords
+    const session = await window.api.invoke('sessions:create', path, currentModel, 'auto')
+    await window.api.invoke('sessions:update', session.id, { segments, status: 'done', name })
+    reload()
+  }
+
+  async function handleDeleteSession(e: React.MouseEvent, id: string): Promise<void> {
+    e.stopPropagation()
+    await window.api.invoke('sessions:delete', id)
+    reload()
+  }
+
+  function handleStartRename(e: React.MouseEvent, session: Session): void {
+    e.stopPropagation()
+    setContextMenu(null)
+    setRenamingId(session.id)
+    setRenameValue(getSessionName(session))
+  }
+
+  function handleContextMenu(e: React.MouseEvent, sessionId: string): void {
+    e.preventDefault()
+    e.stopPropagation()
+    setContextMenu({ sessionId, x: e.clientX, y: e.clientY })
+  }
+
+  function closeContextMenu(): void {
+    setContextMenu(null)
+  }
+
+  async function handleRenameSubmit(id: string): Promise<void> {
+    const trimmed = renameValue.trim()
+    if (trimmed) {
+      await window.api.invoke('sessions:update', id, { name: trimmed })
+    }
+    setRenamingId(null)
     reload()
   }
 
@@ -86,8 +182,40 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
     setCurrentModel(model as WhisperModel)
   }
 
+  const filteredSessions = search.trim()
+    ? sessions.filter((s) =>
+        getSessionName(s).toLowerCase().includes(search.trim().toLowerCase())
+      )
+    : sessions
+
   return (
-    <div className="flex flex-col h-screen bg-white">
+    <div className="flex flex-col h-screen bg-white" onClick={closeContextMenu}>
+      {/* Context menu */}
+      {contextMenu && (() => {
+        const session = sessions.find((s) => s.id === contextMenu.sessionId)
+        if (!session) return null
+        return (
+          <div
+            className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[140px]"
+            style={{ top: contextMenu.y, left: contextMenu.x }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+              onClick={(e) => handleStartRename(e, session)}
+            >
+              <span className="text-base">✎</span> Rename
+            </button>
+            <div className="border-t border-gray-100 my-1" />
+            <button
+              className="w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors flex items-center gap-2"
+              onClick={(e) => { handleDeleteSession(e, contextMenu.sessionId); closeContextMenu() }}
+            >
+              <span className="text-base">✕</span> Delete
+            </button>
+          </div>
+        )
+      })()}
       {/* Header */}
       <div className="flex items-center justify-between px-5 h-11 border-b border-gray-200 shrink-0">
         <div className="flex items-center gap-2">
@@ -118,42 +246,88 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
             <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.06em' }}>
               Sessions
             </Text>
-            <Button size="xs" variant="subtle" color="orange" onClick={handleNewSession}>
-              + New
-            </Button>
+            <Group gap={4}>
+              <Button size="xs" variant="subtle" color="gray" onClick={handleImportText}>
+                Import text
+              </Button>
+              <Button size="xs" variant="subtle" color="orange" onClick={handleNewSession}>
+                + New
+              </Button>
+            </Group>
+          </div>
+
+          {/* Search */}
+          <div className="px-5 py-2 border-b border-gray-100">
+            <TextInput
+              size="xs"
+              placeholder="Search sessions…"
+              value={search}
+              onChange={(e) => setSearch(e.currentTarget.value)}
+              styles={{ input: { backgroundColor: '#f9f9f9' } }}
+            />
           </div>
 
           <ScrollArea className="flex-1">
-            {sessions.length === 0 ? (
+            {filteredSessions.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 gap-1">
-                <Text size="sm" c="dimmed">No sessions yet</Text>
-                <Text size="xs" c="dimmed">Click "+ New" to import an audio file</Text>
+                {sessions.length === 0 ? (
+                  <>
+                    <Text size="sm" c="dimmed">No sessions yet</Text>
+                    <Text size="xs" c="dimmed">Click "+ New" to import an audio file</Text>
+                  </>
+                ) : (
+                  <Text size="sm" c="dimmed">No sessions match your search</Text>
+                )}
               </div>
             ) : (
               <div>
-                {sessions.map((s) => {
+                {filteredSessions.map((s) => {
                   const isLabeled =
                     s.status === 'done' &&
                     s.segments.length > 0 &&
                     s.segments.every((seg) => seg.speakerId !== null)
                   const key = isLabeled ? 'labeled' : s.status
+                  const isRenaming = renamingId === s.id
+
                   return (
                     <div
                       key={s.id}
-                      className="flex items-center gap-3 px-5 py-3 cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-50"
-                      onClick={() => onOpenSession(s.id)}
+                      className="flex items-center gap-3 px-5 py-3 cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-50 group"
+                      onClick={() => !isRenaming && onOpenSession(s.id)}
+                      onContextMenu={(e) => handleContextMenu(e, s.id)}
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate m-0">
-                          {s.audioFile.split('/').pop() ?? s.audioFile}
-                        </p>
+                        {isRenaming ? (
+                          <input
+                            ref={renameInputRef}
+                            className="text-sm font-medium text-gray-900 w-full border border-orange-300 rounded px-1 outline-none"
+                            value={renameValue}
+                            onChange={(e) => setRenameValue(e.currentTarget.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleRenameSubmit(s.id)
+                              if (e.key === 'Escape') setRenamingId(null)
+                            }}
+                            onBlur={() => handleRenameSubmit(s.id)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        ) : (
+                          <p className="text-sm font-medium text-gray-900 truncate m-0">
+                            {getSessionName(s)}
+                          </p>
+                        )}
                         <p className="m-0 mt-0.5 flex items-center gap-1.5">
                           <span className={`inline-block w-1.5 h-1.5 rounded-full ${STATUS_DOT[key]}`} />
                           <span className="text-xs text-gray-500">{STATUS_LABEL[key]}</span>
+                          {key === 'transcribing' && sessionProgress.has(s.id) && (
+                            <span className="text-xs text-blue-400 font-medium">
+                              {Math.round(sessionProgress.get(s.id)!)}%
+                            </span>
+                          )}
                           <span className="text-gray-300 text-xs">·</span>
                           <span className="text-xs text-gray-400">{formatAgo(s.createdAt)}</span>
                         </p>
                       </div>
+
                       <span className="text-gray-300 text-sm shrink-0">›</span>
                     </div>
                   )

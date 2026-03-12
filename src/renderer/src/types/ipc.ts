@@ -4,6 +4,7 @@ export type WhisperModel = 'tiny' | 'base' | 'small' | 'medium' | 'large'
 
 export interface Session {
   id: string
+  name?: string
   createdAt: string
   audioFile: string
   model: WhisperModel
@@ -75,6 +76,7 @@ export interface IpcInvokeMap {
 
   // Native dialogs
   'dialog:open-audio': { args: []; return: string[] | null }
+  'dialog:open-text': { args: []; return: { path: string; content: string } | null }
   'dialog:save': { args: [defaultName: string]; return: string | null }
 
   // File export

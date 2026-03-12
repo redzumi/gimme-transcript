@@ -37,8 +37,10 @@ export function createSession(
   model: WhisperModel,
   language: string
 ): Session {
+  const defaultName = audioFile.split('/').pop()?.replace(/\.[^.]+$/, '') ?? audioFile
   const session: Session = {
     id: randomUUID(),
+    name: defaultName,
     createdAt: new Date().toISOString(),
     audioFile,
     model,

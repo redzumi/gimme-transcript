@@ -23,6 +23,20 @@ export function registerDialogHandlers(): void {
     return result.canceled ? null : result.filePath
   })
 
+  ipcMain.handle('dialog:open-text', async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    const result = await dialog.showOpenDialog(win ?? BrowserWindow.getFocusedWindow()!, {
+      title: 'Select text file',
+      filters: [{ name: 'Text', extensions: ['txt', 'md'] }],
+      properties: ['openFile']
+    })
+    if (result.canceled) return null
+    const { readFile } = await import('fs/promises')
+    const path = result.filePaths[0]
+    const content = await readFile(path, 'utf8')
+    return { path, content }
+  })
+
   ipcMain.handle('export:write', async (_e, filePath: string, content: string) => {
     const { writeFile } = await import('fs/promises')
     await writeFile(filePath, content, 'utf8')
