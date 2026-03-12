@@ -47,7 +47,10 @@ jobs:
 
       - name: build-mac
         if: matrix.os == 'macos-latest'
-        run: npm run build:mac
+        run: |
+          npx electron-vite build
+          npx electron-builder --mac --x64
+          npx electron-builder --mac --arm64
 
       - name: build-win
         if: matrix.os == 'windows-latest'
