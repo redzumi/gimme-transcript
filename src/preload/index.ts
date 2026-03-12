@@ -9,10 +9,7 @@ import type {
 } from '../renderer/src/types/ipc'
 
 const api = {
-  invoke<C extends IpcInvokeChannel>(
-    channel: C,
-    ...args: InvokeArgs<C>
-  ): Promise<InvokeReturn<C>> {
+  invoke<C extends IpcInvokeChannel>(channel: C, ...args: InvokeArgs<C>): Promise<InvokeReturn<C>> {
     return ipcRenderer.invoke(channel, ...args) as Promise<InvokeReturn<C>>
   },
 
@@ -26,25 +23,15 @@ const api = {
     return () => ipcRenderer.removeListener(channel, handler)
   },
 
-  off<C extends IpcEventChannel>(
-    channel: C,
-    listener: (payload: EventPayload<C>) => void
-  ): void {
+  off<C extends IpcEventChannel>(channel: C, listener: (payload: EventPayload<C>) => void): void {
     ipcRenderer.removeAllListeners(channel)
     void listener
   }
 }
 
-if (process.contextIsolated) {
-  try {
-    contextBridge.exposeInMainWorld('electron', electronAPI)
-    contextBridge.exposeInMainWorld('api', api)
-  } catch (error) {
-    console.error(error)
-  }
-} else {
-  // @ts-ignore (define in dts)
-  window.electron = electronAPI
-  // @ts-ignore (define in dts)
-  window.api = api
+try {
+  contextBridge.exposeInMainWorld('electron', electronAPI)
+} catch (error) {
+  console.error(error)
 }
+contextBridge.exposeInMainWorld('api', api)

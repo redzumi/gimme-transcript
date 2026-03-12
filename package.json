@@ -57,6 +57,7 @@
     "@electron-toolkit/utils": "^4.0.0",
     "@mantine/core": "^8.3.16",
     "@mantine/hooks": "^8.3.16",
+    "@tanstack/react-virtual": "^3.13.22",
     "electron-updater": "^6.3.9"
   },
   "devDependencies": {

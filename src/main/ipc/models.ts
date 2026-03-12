@@ -51,6 +51,12 @@ interface ActiveDownload {
 
 const activeDownloads = new Map<WhisperModel, ActiveDownload>()
 
+let modelsCache: ModelInfo[] | null = null
+
+function invalidateModelsCache(): void {
+  modelsCache = null
+}
+
 function downloadModel(model: WhisperModel): Promise<void> {
   return new Promise((resolve, reject) => {
     const dest = modelPath(model)
@@ -70,7 +76,12 @@ function downloadModel(model: WhisperModel): Promise<void> {
       currentReq = (lib.get as (url: string, cb: (res: IncomingMessage) => void) => ClientRequest)(
         fetchUrl,
         (res) => {
-          if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          if (
+            res.statusCode &&
+            res.statusCode >= 300 &&
+            res.statusCode < 400 &&
+            res.headers.location
+          ) {
             res.resume()
             const location = res.headers.location
             const next = location.startsWith('http')
@@ -107,9 +118,14 @@ function downloadModel(model: WhisperModel): Promise<void> {
           file.on('finish', () => {
             activeDownloads.delete(model)
             if (cancelled) {
-              try { unlinkSync(dest) } catch { /* ignore */ }
+              try {
+                unlinkSync(dest)
+              } catch {
+                /* ignore */
+              }
               reject(new Error('Cancelled'))
             } else {
+              invalidateModelsCache()
               broadcast('models:download-progress', { model, percent: 100, bytesPerSec: 0 })
               broadcast('models:download-done', { model })
               resolve()
@@ -118,13 +134,21 @@ function downloadModel(model: WhisperModel): Promise<void> {
 
           file.on('error', (err) => {
             activeDownloads.delete(model)
-            try { unlinkSync(dest) } catch { /* ignore */ }
+            try {
+              unlinkSync(dest)
+            } catch {
+              /* ignore */
+            }
             reject(err)
           })
 
           res.on('error', (err) => {
             activeDownloads.delete(model)
-            try { unlinkSync(dest) } catch { /* ignore */ }
+            try {
+              unlinkSync(dest)
+            } catch {
+              /* ignore */
+            }
             reject(err)
           })
         }
@@ -153,12 +177,14 @@ function downloadModel(model: WhisperModel): Promise<void> {
 
 export function registerModelHandlers(): void {
   ipcMain.handle('models:list', (): ModelInfo[] => {
+    if (modelsCache) return modelsCache
     const models: WhisperModel[] = ['tiny', 'base', 'small', 'medium', 'large']
-    return models.map((model) => ({
+    modelsCache = models.map((model) => ({
       model,
       sizeBytes: MODEL_SIZES[model],
       downloaded: isModelDownloaded(model)
     }))
+    return modelsCache
   })
 
   ipcMain.handle('models:download', async (_e, model: WhisperModel) => {
@@ -182,5 +208,6 @@ export function registerModelHandlers(): void {
   ipcMain.handle('models:delete', (_e, model: WhisperModel) => {
     const p = modelPath(model)
     if (existsSync(p)) unlinkSync(p)
+    invalidateModelsCache()
   })
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Text, Button, Group, Progress, ScrollArea, Select, Modal, Checkbox } from '@mantine/core'
+import { useVirtualizer } from '@tanstack/react-virtual'
+import { Text, Button, Group, Progress, Select, Modal, Checkbox } from '@mantine/core'
 import type { Session, Segment, Speaker, WhisperModel } from '../types/ipc'
 
 interface Props {
@@ -44,9 +45,18 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
   const [pendingSeg, setPendingSeg] = useState<Segment | null>(null)
   const editRef = useRef<HTMLTextAreaElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
+  const segmentScrollRef = useRef<HTMLDivElement>(null)
   const playEndRef = useRef<number>(0)
   const isDraggingRef = useRef(false)
   const didDragRef = useRef(false)
+
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const rowVirtualizer = useVirtualizer({
+    count: session?.segments.length ?? 0,
+    getScrollElement: () => segmentScrollRef.current,
+    estimateSize: () => 60,
+    overscan: 5
+  })
 
   const reload = useCallback(async () => {
     const [s, sp, modelList] = await Promise.all([
@@ -286,7 +296,6 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
     setError(null)
     setSession((prev) => (prev ? { ...prev, status: 'transcribing' } : prev))
     await window.api.invoke('whisper:transcribe', sessionId)
-    reload()
   }
 
   if (!session) return <div className="h-screen bg-white" />
@@ -496,164 +505,182 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
       )}
 
       {showTranscript && (
-        <ScrollArea className="flex-1">
-          <div className="py-6">
-            {session.segments.length === 0 && session.status === 'transcribing' && (
-              <div className="flex items-center justify-center h-20">
+        <>
+          {session.segments.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center">
+              {session.status === 'transcribing' ? (
                 <Text size="sm" c="dimmed">
                   Waiting for first segment…
                 </Text>
-              </div>
-            )}
-
-            {session.segments.length === 0 && session.status === 'done' && (
-              <PasteArea
-                onSubmit={async (text) => {
-                  const blocks = text.includes('\n\n') ? text.split(/\n\n+/) : text.split(/\n/)
-                  const segments = blocks
-                    .map((b) => b.trim())
-                    .filter((b) => b.length > 0)
-                    .map((b, i) => ({
-                      id: `pasted-${i}-${Math.random().toString(36).slice(2)}`,
-                      start: 0,
-                      end: 0,
-                      text: b,
-                      speakerId: null
-                    }))
-                  const updated = await window.api.invoke('sessions:update', sessionId, {
-                    segments
-                  })
-                  setSession(updated)
+              ) : (
+                <PasteArea
+                  onSubmit={async (text) => {
+                    const blocks = text.includes('\n\n') ? text.split(/\n\n+/) : text.split(/\n/)
+                    const segments = blocks
+                      .map((b) => b.trim())
+                      .filter((b) => b.length > 0)
+                      .map((b, i) => ({
+                        id: `pasted-${i}-${Math.random().toString(36).slice(2)}`,
+                        start: 0,
+                        end: 0,
+                        text: b,
+                        speakerId: null
+                      }))
+                    const updated = await window.api.invoke('sessions:update', sessionId, {
+                      segments
+                    })
+                    setSession(updated)
+                  }}
+                />
+              )}
+            </div>
+          ) : (
+            <div ref={segmentScrollRef} className="flex-1 overflow-y-auto">
+              <div
+                style={{
+                  height: rowVirtualizer.getTotalSize() + 48,
+                  position: 'relative'
                 }}
-              />
-            )}
+              >
+                {rowVirtualizer.getVirtualItems().map((vItem) => {
+                  const seg = session.segments[vItem.index]
+                  const idx = vItem.index
+                  const speaker = speakers.find((s) => s.id === seg.speakerId)
+                  const colorIdx = speaker ? (speakerColorMap.get(speaker.id) ?? 0) : -1
+                  const colors =
+                    colorIdx >= 0 ? SPEAKER_COLORS[colorIdx % SPEAKER_COLORS.length] : null
+                  const isSelected = selectedIds.has(seg.id)
+                  const isEditing = editingId === seg.id
 
-            {session.segments.map((seg, idx) => {
-              const speaker = speakers.find((s) => s.id === seg.speakerId)
-              const colorIdx = speaker ? (speakerColorMap.get(speaker.id) ?? 0) : -1
-              const colors = colorIdx >= 0 ? SPEAKER_COLORS[colorIdx % SPEAKER_COLORS.length] : null
-              const isSelected = selectedIds.has(seg.id)
-              const isEditing = editingId === seg.id
-
-              return (
-                <div
-                  key={seg.id}
-                  data-segment
-                  className={`flex gap-0 py-2 transition-colors ${
-                    isEditing
-                      ? 'bg-white px-10'
-                      : `cursor-pointer select-none ${
-                          isSelected
-                            ? 'bg-orange-100 pl-[calc(2.5rem-3px)] pr-10 border-l-[3px] border-orange-400'
-                            : 'px-10 hover:bg-gray-50'
-                        }`
-                  }`}
-                  onContextMenu={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    if (!isSelected) {
-                      setAnchorIdx(idx)
-                      setFocusIdx(idx)
-                    }
-                    setSegCtxMenu({ x: e.clientX, y: e.clientY })
-                  }}
-                  onMouseDown={(e) => {
-                    if (e.button !== 0 || isEditing) return
-                    isDraggingRef.current = true
-                    didDragRef.current = false
-                    if (!e.shiftKey) {
-                      setAnchorIdx(idx)
-                      setFocusIdx(idx)
-                    }
-                  }}
-                  onMouseEnter={() => {
-                    if (!isDraggingRef.current) return
-                    didDragRef.current = true
-                    setFocusIdx(idx)
-                  }}
-                  onClick={(e) => {
-                    if (isEditing) return
-                    if (didDragRef.current) {
-                      didDragRef.current = false
-                      return
-                    }
-                    e.stopPropagation()
-                    handleSegmentClick(idx, e.shiftKey)
-                  }}
-                >
-                  <div className="w-32 shrink-0 flex flex-col items-end gap-0.5 pr-4 pt-0.5">
-                    {speaker ? (
-                      <span
-                        className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${colors?.pill ?? ''}`}
-                      >
-                        {speaker.name}
-                      </span>
-                    ) : (
-                      <span className="text-[11px] text-gray-300 font-medium">—</span>
-                    )}
-                    <span className="text-[10px] font-mono text-gray-300">
-                      {formatTime(seg.start)}
-                    </span>
-                    {hasAudio && seg.end > seg.start && (
-                      <button
-                        className={`text-[11px] leading-none transition-colors mt-0.5 ${
-                          playingId === seg.id
-                            ? 'text-orange-500'
-                            : 'text-gray-300 hover:text-orange-400'
-                        }`}
-                        title={playingId === seg.id ? 'Pause' : 'Play segment'}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handlePlaySegment(seg)
-                        }}
-                      >
-                        {playingId === seg.id ? '⏸' : '▶'}
-                      </button>
-                    )}
-                  </div>
-
-                  {isEditing ? (
-                    <textarea
-                      ref={editRef}
-                      className="flex-1 text-sm text-gray-800 leading-relaxed resize-none outline-none border border-orange-300 rounded px-2 py-0.5 bg-orange-50 focus:bg-white transition-colors"
-                      value={editValue}
-                      rows={Math.max(2, editValue.split('\n').length)}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      onBlur={() => handleEditSave(seg.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Escape') {
-                          e.preventDefault()
-                          handleEditCancel()
+                  return (
+                    <div
+                      key={vItem.key}
+                      data-index={vItem.index}
+                      ref={rowVirtualizer.measureElement}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        transform: `translateY(${vItem.start + 24}px)`
+                      }}
+                      data-segment
+                      className={`flex gap-0 py-2 transition-colors ${
+                        isEditing
+                          ? 'bg-white px-10'
+                          : `cursor-pointer select-none ${
+                              isSelected
+                                ? 'bg-orange-100 pl-[calc(2.5rem-3px)] pr-10 border-l-[3px] border-orange-400'
+                                : 'px-10 hover:bg-gray-50'
+                            }`
+                      }`}
+                      onContextMenu={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        if (!isSelected) {
+                          setAnchorIdx(idx)
+                          setFocusIdx(idx)
                         }
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault()
-                          handleEditSave(seg.id)
+                        setSegCtxMenu({ x: e.clientX, y: e.clientY })
+                      }}
+                      onMouseDown={(e) => {
+                        if (e.button !== 0 || isEditing) return
+                        isDraggingRef.current = true
+                        didDragRef.current = false
+                        if (!e.shiftKey) {
+                          setAnchorIdx(idx)
+                          setFocusIdx(idx)
                         }
                       }}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  ) : (
-                    <p
-                      className="flex-1 text-sm text-gray-800 leading-relaxed m-0"
-                      onDoubleClick={(e) => {
+                      onMouseEnter={() => {
+                        if (!isDraggingRef.current) return
+                        didDragRef.current = true
+                        setFocusIdx(idx)
+                      }}
+                      onClick={(e) => {
+                        if (isEditing) return
+                        if (didDragRef.current) {
+                          didDragRef.current = false
+                          return
+                        }
                         e.stopPropagation()
-                        handleEditStart(seg)
+                        handleSegmentClick(idx, e.shiftKey)
                       }}
                     >
-                      {seg.text.trim()}
-                    </p>
-                  )}
-                </div>
-              )
-            })}
+                      <div className="w-32 shrink-0 flex flex-col items-end gap-0.5 pr-4 pt-0.5">
+                        {speaker ? (
+                          <span
+                            className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${colors?.pill ?? ''}`}
+                          >
+                            {speaker.name}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-gray-300 font-medium">—</span>
+                        )}
+                        <span className="text-[10px] font-mono text-gray-300">
+                          {formatTime(seg.start)}
+                        </span>
+                        {hasAudio && seg.end > seg.start && (
+                          <button
+                            className={`text-[11px] leading-none transition-colors mt-0.5 ${
+                              playingId === seg.id
+                                ? 'text-orange-500'
+                                : 'text-gray-300 hover:text-orange-400'
+                            }`}
+                            title={playingId === seg.id ? 'Pause' : 'Play segment'}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handlePlaySegment(seg)
+                            }}
+                          >
+                            {playingId === seg.id ? '⏸' : '▶'}
+                          </button>
+                        )}
+                      </div>
 
-            {session.status === 'transcribing' && session.segments.length > 0 && (
-              <div className="px-10 py-2 pl-[8.5rem]">
-                <span className="inline-block w-0.5 h-4 bg-orange-400 animate-pulse rounded" />
+                      {isEditing ? (
+                        <textarea
+                          ref={editRef}
+                          className="flex-1 text-sm text-gray-800 leading-relaxed resize-none outline-none border border-orange-300 rounded px-2 py-0.5 bg-orange-50 focus:bg-white transition-colors"
+                          value={editValue}
+                          rows={Math.max(2, editValue.split('\n').length)}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onBlur={() => handleEditSave(seg.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') {
+                              e.preventDefault()
+                              handleEditCancel()
+                            }
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault()
+                              handleEditSave(seg.id)
+                            }
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : (
+                        <p
+                          className="flex-1 text-sm text-gray-800 leading-relaxed m-0"
+                          onDoubleClick={(e) => {
+                            e.stopPropagation()
+                            handleEditStart(seg)
+                          }}
+                        >
+                          {seg.text.trim()}
+                        </p>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
-            )}
-          </div>
-        </ScrollArea>
+            </div>
+          )}
+          {session.status === 'transcribing' && session.segments.length > 0 && (
+            <div className="px-10 py-2 pl-[8.5rem] shrink-0 border-t border-gray-50">
+              <span className="inline-block w-0.5 h-4 bg-orange-400 animate-pulse rounded" />
+            </div>
+          )}
+        </>
       )}
 
       <MergeExportModal

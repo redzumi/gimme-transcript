@@ -3,10 +3,18 @@ import { randomUUID } from 'crypto'
 import type { Session, WhisperModel } from '../../renderer/src/types/ipc'
 import { getSessionPath, getSessionsDir } from './paths'
 
+function migrate(session: Session): Session {
+  // v1 → current: backfill schemaVersion for sessions created before versioning
+  if (!session.schemaVersion) {
+    return { ...session, schemaVersion: 1 }
+  }
+  return session
+}
+
 function read(id: string): Session | null {
   const p = getSessionPath(id)
   if (!existsSync(p)) return null
-  return JSON.parse(readFileSync(p, 'utf8')) as Session
+  return migrate(JSON.parse(readFileSync(p, 'utf8')) as Session)
 }
 
 function write(session: Session): void {
@@ -19,7 +27,7 @@ export function listSessions(): Session[] {
     .filter((f) => f.endsWith('.json'))
     .map((f) => {
       try {
-        return JSON.parse(readFileSync(`${dir}/${f}`, 'utf8')) as Session
+        return migrate(JSON.parse(readFileSync(`${dir}/${f}`, 'utf8')) as Session)
       } catch {
         return null
       }
@@ -32,13 +40,14 @@ export function getSession(id: string): Session | null {
   return read(id)
 }
 
-export function createSession(
-  audioFile: string,
-  model: WhisperModel,
-  language: string
-): Session {
-  const defaultName = audioFile.split('/').pop()?.replace(/\.[^.]+$/, '') ?? audioFile
+export function createSession(audioFile: string, model: WhisperModel, language: string): Session {
+  const defaultName =
+    audioFile
+      .split('/')
+      .pop()
+      ?.replace(/\.[^.]+$/, '') ?? audioFile
   const session: Session = {
+    schemaVersion: 1,
     id: randomUUID(),
     name: defaultName,
     createdAt: new Date().toISOString(),

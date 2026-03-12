@@ -82,7 +82,7 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
         next.delete(sessionId)
         return next
       })
-      reload()
+      setSessions((prev) => prev.map((s) => (s.id === sessionId ? { ...s, status: 'done' } : s)))
     })
 
     return () => {
@@ -102,10 +102,11 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
     setNewMenuOpen(false)
     const files = await window.api.invoke('dialog:open-audio')
     if (!files) return
+    const created: Session[] = []
     for (const file of files) {
-      await window.api.invoke('sessions:create', file, currentModel, 'auto')
+      created.push(await window.api.invoke('sessions:create', file, currentModel, 'auto'))
     }
-    reload()
+    setSessions((prev) => [...created.reverse(), ...prev])
   }
 
   async function handleImportText(): Promise<void> {
@@ -127,21 +128,28 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
     const firstWords = segments[0]?.text.slice(0, 40) ?? 'Imported text'
     const name = firstWords.length < (segments[0]?.text.length ?? 0) ? firstWords + '…' : firstWords
     const session = await window.api.invoke('sessions:create', path, currentModel, 'auto')
-    await window.api.invoke('sessions:update', session.id, { segments, status: 'done', name })
-    reload()
+    const updated = await window.api.invoke('sessions:update', session.id, {
+      segments,
+      status: 'done',
+      name
+    })
+    setSessions((prev) => [updated, ...prev])
   }
 
   async function handleEmptySession(): Promise<void> {
     setNewMenuOpen(false)
     const session = await window.api.invoke('sessions:create', '', currentModel, 'auto')
-    await window.api.invoke('sessions:update', session.id, { name: 'New session', status: 'done' })
-    reload()
+    const updated = await window.api.invoke('sessions:update', session.id, {
+      name: 'New session',
+      status: 'done'
+    })
+    setSessions((prev) => [updated, ...prev])
   }
 
   async function handleDeleteSession(e: React.MouseEvent, id: string): Promise<void> {
     e.stopPropagation()
+    setSessions((prev) => prev.filter((s) => s.id !== id))
     await window.api.invoke('sessions:delete', id)
-    reload()
   }
 
   function handleStartRename(e: React.MouseEvent, session: Session): void {
@@ -163,25 +171,25 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
 
   async function handleRenameSubmit(id: string): Promise<void> {
     const trimmed = renameValue.trim()
+    setRenamingId(null)
     if (trimmed) {
+      setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, name: trimmed } : s)))
       await window.api.invoke('sessions:update', id, { name: trimmed })
     }
-    setRenamingId(null)
-    reload()
   }
 
   async function handleAddSpeaker(): Promise<void> {
     const name = newSpeakerName.trim()
     if (!name) return
-    await window.api.invoke('speakers:create', name)
+    const speaker = await window.api.invoke('speakers:create', name)
+    setSpeakers((prev) => [...prev, speaker])
     setNewSpeakerName('')
     setAddingSpeaker(false)
-    reload()
   }
 
   async function handleDeleteSpeaker(id: string): Promise<void> {
+    setSpeakers((prev) => prev.filter((s) => s.id !== id))
     await window.api.invoke('speakers:delete', id)
-    reload()
   }
 
   async function handleModelChange(model: string | null): Promise<void> {

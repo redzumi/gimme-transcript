@@ -3,6 +3,7 @@
 // Everything else is converted to 16kHz mono WAV via ffmpeg (async, non-blocking).
 
 import { execSync, spawn } from 'child_process'
+import { existsSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { randomUUID } from 'crypto'
@@ -13,10 +14,36 @@ function ext(filePath: string): string {
   return filePath.toLowerCase().split('.').pop() ?? ''
 }
 
+const FFMPEG_FALLBACK_PATHS: Record<NodeJS.Platform, string[]> = {
+  darwin: ['/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg'],
+  linux: ['/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/snap/bin/ffmpeg'],
+  win32: [
+    'C:\\ffmpeg\\bin\\ffmpeg.exe',
+    'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe',
+    'C:\\ProgramData\\chocolatey\\bin\\ffmpeg.exe'
+  ]
+} as Record<NodeJS.Platform, string[]>
+
+function ffmpegInstallHint(): string {
+  if (process.platform === 'darwin') return 'Install with: brew install ffmpeg'
+  if (process.platform === 'win32')
+    return 'Download from https://ffmpeg.org/download.html and add to PATH'
+  return 'Install with: sudo apt install ffmpeg  (or equivalent for your distro)'
+}
+
 function findFfmpeg(): string | null {
+  const cmd = process.platform === 'win32' ? 'where' : 'which'
   try {
-    return execSync('which ffmpeg', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim() || null
+    const result = execSync(`${cmd} ffmpeg`, {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe']
+    }).trim()
+    return result.split('\n')[0] || null
   } catch {
+    const fallbacks = FFMPEG_FALLBACK_PATHS[process.platform] ?? []
+    for (const p of fallbacks) {
+      if (existsSync(p)) return p
+    }
     return null
   }
 }
@@ -32,12 +59,18 @@ export function convertForPlayback(
   onProgress: (percent: number) => void
 ): Promise<void> {
   const ffmpeg = findFfmpeg()
-  if (!ffmpeg) return Promise.reject(new Error('ffmpeg not found. Install with: brew install ffmpeg'))
+  if (!ffmpeg) return Promise.reject(new Error(`ffmpeg not found. ${ffmpegInstallHint()}`))
 
   return new Promise((resolve, reject) => {
     const proc = spawn(ffmpeg, [
-      '-y', '-i', inputPath,
-      '-vn', '-acodec', 'libmp3lame', '-b:a', '128k',
+      '-y',
+      '-i',
+      inputPath,
+      '-vn',
+      '-acodec',
+      'libmp3lame',
+      '-b:a',
+      '128k',
       outputPath
     ])
 
@@ -57,8 +90,10 @@ export function convertForPlayback(
     })
 
     proc.on('close', (code) => {
-      if (code === 0) { onProgress(100); resolve() }
-      else reject(new Error(`ffmpeg exited with code ${code}`))
+      if (code === 0) {
+        onProgress(100)
+        resolve()
+      } else reject(new Error(`ffmpeg exited with code ${code}`))
     })
     proc.on('error', reject)
   })
@@ -73,8 +108,10 @@ export function prepareAudio(inputPath: string): Promise<ConvertResult> {
   if (!ffmpeg) {
     return Promise.reject(
       new Error(
-        'ffmpeg not found. Install it with: brew install ffmpeg\n' +
-        'Required to convert ' + ext(inputPath).toUpperCase() + ' files.'
+        `ffmpeg not found. ${ffmpegInstallHint()}\n` +
+          'Required to convert ' +
+          ext(inputPath).toUpperCase() +
+          ' files.'
       )
     )
   }
@@ -83,8 +120,15 @@ export function prepareAudio(inputPath: string): Promise<ConvertResult> {
 
   return new Promise((resolve, reject) => {
     const proc = spawn(ffmpeg, [
-      '-y', '-i', inputPath,
-      '-ar', '16000', '-ac', '1', '-c:a', 'pcm_s16le',
+      '-y',
+      '-i',
+      inputPath,
+      '-ar',
+      '16000',
+      '-ac',
+      '1',
+      '-c:a',
+      'pcm_s16le',
       wavPath
     ])
 
