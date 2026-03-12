@@ -47,18 +47,18 @@ jobs:
 
       - name: build-linux
         if: matrix.os == 'ubuntu-latest'
-        run: npm run build:linux
+        run: npx electron-vite build && npx electron-builder --linux --publish never
 
       - name: build-mac
         if: matrix.os == 'macos-latest'
         run: |
           npx electron-vite build
-          npx electron-builder --mac --x64
-          npx electron-builder --mac --arm64
+          npx electron-builder --mac --x64 --publish never
+          npx electron-builder --mac --arm64 --publish never
 
       - name: build-win
         if: matrix.os == 'windows-latest'
-        run: npm run build:win
+        run: npx electron-vite build && npx electron-builder --win --publish never
 
       - name: Release
         uses: softprops/action-gh-release@v1
