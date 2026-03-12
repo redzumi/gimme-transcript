@@ -41,6 +41,10 @@ jobs:
             npm install --include=optional
           }
 
+      - name: Install rollup Windows native module
+        if: matrix.os == 'windows-latest'
+        run: npm install --no-save @rollup/rollup-win32-x64-msvc
+
       - name: build-linux
         if: matrix.os == 'ubuntu-latest'
         run: npm run build:linux
