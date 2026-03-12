@@ -21,7 +21,7 @@ export default function App(): React.JSX.Element {
     })
   }, [])
 
-  if (!screen) return <div className="h-screen bg-[#0f1117]" />
+  if (!screen) return <div className="h-screen bg-white" />
 
   if (screen.name === 'firstLaunch') {
     return <FirstLaunch onDone={() => setScreen({ name: 'home' })} />

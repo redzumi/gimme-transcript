@@ -1,15 +1,5 @@
 import { useState, useEffect } from 'react'
-import {
-  Title,
-  Text,
-  Button,
-  Stack,
-  Radio,
-  Progress,
-  Group,
-  Badge,
-  Paper
-} from '@mantine/core'
+import { Text, Button, Stack, Progress, Group, Badge } from '@mantine/core'
 import type { WhisperModel, ModelInfo } from '../types/ipc'
 
 interface Props {
@@ -17,11 +7,11 @@ interface Props {
 }
 
 const MODEL_LABELS: Record<WhisperModel, { size: string; note: string }> = {
-  tiny:   { size: '75 MB',   note: 'fast, less accurate' },
-  base:   { size: '142 MB',  note: 'fast, decent quality' },
-  small:  { size: '466 MB',  note: 'good balance' },
-  medium: { size: '1.5 GB',  note: 'recommended' },
-  large:  { size: '2.9 GB',  note: 'slow, most accurate' }
+  tiny: { size: '75 MB', note: 'fast, less accurate' },
+  base: { size: '142 MB', note: 'fast, decent quality' },
+  small: { size: '466 MB', note: 'good balance' },
+  medium: { size: '1.5 GB', note: 'recommended for Russian' },
+  large: { size: '2.9 GB', note: 'slow, most accurate' },
 }
 
 export default function FirstLaunch({ onDone }: Props): React.JSX.Element {
@@ -33,10 +23,9 @@ export default function FirstLaunch({ onDone }: Props): React.JSX.Element {
   useEffect(() => {
     window.api.invoke('models:list').then(setModels)
 
-    const off = window.api.on('models:download-progress', ({ model, percent }) => {
+    const offProgress = window.api.on('models:download-progress', ({ model, percent }) => {
       if (model === selected) setProgress(percent)
     })
-
     const offDone = window.api.on('models:download-done', ({ model }) => {
       if (model === selected) {
         setDownloading(false)
@@ -46,7 +35,7 @@ export default function FirstLaunch({ onDone }: Props): React.JSX.Element {
     })
 
     return () => {
-      off()
+      offProgress()
       offDone()
     }
   }, [selected])
@@ -67,67 +56,72 @@ export default function FirstLaunch({ onDone }: Props): React.JSX.Element {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0f1117]">
-      <Paper p="xl" radius="md" className="w-full max-w-md" bg="dark.8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="w-full max-w-sm bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
         <Stack gap="xl">
-          <Stack gap={4}>
-            <Title order={2} fw={600}>
-              scribe-my-bitch-up
-            </Title>
-            <Text c="dimmed" size="sm">
+          <div>
+            <h1 className="text-lg font-semibold text-gray-900 mb-1">scribe</h1>
+            <p className="text-sm text-gray-500 leading-relaxed">
               To get started, download a Whisper model.
               <br />
-              Models run locally — no internet after this.
-            </Text>
-          </Stack>
+              Everything runs locally — no internet after this.
+            </p>
+          </div>
 
-          <Radio.Group value={selected} onChange={(v) => setSelected(v as WhisperModel)}>
-            <Stack gap="xs">
-              {(['tiny', 'base', 'small', 'medium', 'large'] as WhisperModel[]).map((m) => (
-                <Paper
+          {/* Model picker */}
+          <Stack gap="xs">
+            {(['tiny', 'base', 'small', 'medium', 'large'] as WhisperModel[]).map((m) => {
+              const isSelected = selected === m
+              const isDownloaded = downloadedModels.includes(m)
+              return (
+                <button
                   key={m}
-                  p="sm"
-                  radius="sm"
-                  bg={selected === m ? 'dark.6' : 'dark.7'}
-                  className="cursor-pointer"
+                  className={`w-full text-left px-4 py-3 rounded-xl border transition-all ${
+                    isSelected
+                      ? 'border-indigo-300 bg-indigo-50'
+                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                  }`}
                   onClick={() => setSelected(m)}
                 >
-                  <Group justify="space-between">
-                    <Group gap="sm">
-                      <Radio value={m} />
-                      <div>
-                        <Text fw={500} size="sm">
-                          {m}
-                        </Text>
-                        <Text c="dimmed" size="xs">
-                          {MODEL_LABELS[m].note}
-                        </Text>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${
+                          isSelected ? 'border-indigo-500' : 'border-gray-300'
+                        }`}
+                      >
+                        {isSelected && (
+                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                        )}
                       </div>
-                    </Group>
-                    <Group gap="xs">
-                      <Text c="dimmed" size="xs">
-                        {MODEL_LABELS[m].size}
-                      </Text>
-                      {downloadedModels.includes(m) && (
-                        <Badge size="xs" color="green" variant="light">
-                          downloaded
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">{m}</span>
+                        <span className="text-xs text-gray-400 ml-2">{MODEL_LABELS[m].note}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-400">{MODEL_LABELS[m].size}</span>
+                      {isDownloaded && (
+                        <Badge size="xs" color="teal" variant="light">
+                          ready
                         </Badge>
                       )}
-                      {m === 'medium' && !downloadedModels.includes(m) && (
-                        <Badge size="xs" color="blue" variant="light">
+                      {m === 'medium' && !isDownloaded && (
+                        <Badge size="xs" color="indigo" variant="light">
                           recommended
                         </Badge>
                       )}
-                    </Group>
-                  </Group>
-                </Paper>
-              ))}
-            </Stack>
-          </Radio.Group>
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </Stack>
 
+          {/* Progress */}
           {downloading && (
             <Stack gap="xs">
-              <Progress value={progress} animated size="md" radius="sm" />
+              <Progress value={progress} animated size="sm" color="indigo" radius="xl" />
               <Group justify="space-between">
                 <Text size="xs" c="dimmed">
                   Downloading {selected}… {Math.round(progress)}%
@@ -139,13 +133,16 @@ export default function FirstLaunch({ onDone }: Props): React.JSX.Element {
             </Stack>
           )}
 
+          {/* Action */}
           {selectedDownloaded ? (
-            <Button size="md" onClick={onDone}>
+            <Button color="indigo" size="md" radius="xl" onClick={onDone}>
               Get started
             </Button>
           ) : (
             <Button
+              color="indigo"
               size="md"
+              radius="xl"
               onClick={handleDownload}
               loading={downloading}
               disabled={downloading}
@@ -154,7 +151,7 @@ export default function FirstLaunch({ onDone }: Props): React.JSX.Element {
             </Button>
           )}
         </Stack>
-      </Paper>
+      </div>
     </div>
   )
 }

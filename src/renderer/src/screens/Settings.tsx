@@ -1,15 +1,5 @@
 import { useState, useEffect } from 'react'
-import {
-  Title,
-  Text,
-  Button,
-  Stack,
-  Select,
-  Group,
-  Badge,
-  Divider,
-  TextInput
-} from '@mantine/core'
+import { Text, Button, Stack, Select, Group, Badge, TextInput } from '@mantine/core'
 import type { Settings, ModelInfo, WhisperModel } from '../types/ipc'
 
 interface Props {
@@ -21,7 +11,7 @@ const MODEL_SIZES: Record<WhisperModel, string> = {
   base: '142 MB',
   small: '466 MB',
   medium: '1.5 GB',
-  large: '2.9 GB'
+  large: '2.9 GB',
 }
 
 export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
@@ -33,7 +23,7 @@ export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
   async function reload(): Promise<void> {
     const [s, m] = await Promise.all([
       window.api.invoke('settings:get'),
-      window.api.invoke('models:list')
+      window.api.invoke('models:list'),
     ])
     setSettings(s)
     setModels(m)
@@ -46,7 +36,6 @@ export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
       setDownloading(model)
       setDownloadProgress(percent)
     })
-
     const offDone = window.api.on('models:download-done', () => {
       setDownloading(null)
       setDownloadProgress(0)
@@ -75,26 +64,23 @@ export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
     reload()
   }
 
-  async function handleChangePath(): Promise<void> {
-    // Use dialog to pick directory — wired in T-010 via dialog:open-audio stub
-    // For now just show the current path
-  }
-
-  if (!settings) return <div className="h-screen flex items-center justify-center text-white">Loading…</div>
+  if (!settings) return <div className="h-screen bg-white" />
 
   return (
-    <div className="flex flex-col h-screen bg-[#0f1117] text-white">
+    <div className="flex flex-col h-screen bg-white">
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 py-3 border-b border-white/10">
-        <Button size="xs" variant="subtle" onClick={onBack}>
+      <div className="flex items-center gap-2 px-4 h-11 border-b border-gray-200 shrink-0">
+        <button
+          className="text-xs text-gray-400 hover:text-gray-800 transition-colors px-1.5 py-1 rounded hover:bg-gray-100"
+          onClick={onBack}
+        >
           ← Back
-        </Button>
-        <Title order={4} fw={600}>
-          Settings
-        </Title>
+        </button>
+        <div className="w-px h-3.5 bg-gray-200" />
+        <span className="text-sm font-semibold text-gray-900">Settings</span>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 py-6">
+      <div className="flex-1 overflow-y-auto px-6 py-6">
         <Stack gap="xl" maw={480}>
           {/* Defaults */}
           <Stack gap="md">
@@ -107,7 +93,7 @@ export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
                 { value: 'base', label: 'base (142 MB)' },
                 { value: 'small', label: 'small (466 MB)' },
                 { value: 'medium', label: 'medium (1.5 GB)' },
-                { value: 'large', label: 'large (2.9 GB)' }
+                { value: 'large', label: 'large (2.9 GB)' },
               ]}
             />
             <Select
@@ -120,7 +106,7 @@ export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
                 { value: 'en', label: 'English' },
                 { value: 'de', label: 'German' },
                 { value: 'fr', label: 'French' },
-                { value: 'es', label: 'Spanish' }
+                { value: 'es', label: 'Spanish' },
               ]}
             />
             <Group align="flex-end" gap="sm">
@@ -131,77 +117,89 @@ export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
                 flex={1}
                 styles={{ input: { fontFamily: 'monospace', fontSize: 12 } }}
               />
-              <Button size="sm" variant="default" onClick={handleChangePath}>
+              <Button size="sm" variant="default">
                 Change
               </Button>
             </Group>
           </Stack>
 
-          <Divider opacity={0.15} label="Models" labelPosition="left" />
+          {/* Divider */}
+          <div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-px flex-1 bg-gray-200" />
+              <Text size="xs" c="dimmed" fw={600} tt="uppercase" style={{ letterSpacing: '0.06em' }}>
+                Models
+              </Text>
+              <div className="h-px flex-1 bg-gray-200" />
+            </div>
 
-          {/* Models */}
-          <Stack gap="sm">
-            {models.map((m) => (
-              <Group key={m.model} justify="space-between">
-                <Group gap="sm">
-                  <Text fw={500} size="sm" w={60}>
-                    {m.model}
-                  </Text>
-                  <Text c="dimmed" size="xs">
-                    {MODEL_SIZES[m.model]}
-                  </Text>
-                  {m.model === settings.defaultModel && (
-                    <Badge size="xs" color="blue" variant="light">
-                      default
-                    </Badge>
-                  )}
-                </Group>
-                <Group gap="xs">
-                  {m.downloaded ? (
-                    <>
-                      <Badge size="xs" color="green" variant="light">
-                        downloaded
+            <Stack gap="sm">
+              {models.map((m) => (
+                <div
+                  key={m.model}
+                  className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"
+                >
+                  <div className="flex items-center gap-3">
+                    <Text fw={500} size="sm" w={60}>
+                      {m.model}
+                    </Text>
+                    <Text c="dimmed" size="xs">
+                      {MODEL_SIZES[m.model]}
+                    </Text>
+                    {m.model === settings.defaultModel && (
+                      <Badge size="xs" color="indigo" variant="light">
+                        default
                       </Badge>
+                    )}
+                  </div>
+                  <Group gap="xs">
+                    {m.downloaded ? (
+                      <>
+                        <Badge size="xs" color="teal" variant="light">
+                          downloaded
+                        </Badge>
+                        <Button
+                          size="xs"
+                          variant="subtle"
+                          color="red"
+                          onClick={() => handleDelete(m.model)}
+                        >
+                          Delete
+                        </Button>
+                      </>
+                    ) : downloading === m.model ? (
+                      <Group gap="xs">
+                        <Text size="xs" c="dimmed">
+                          {Math.round(downloadProgress)}%
+                        </Text>
+                        <Button
+                          size="xs"
+                          variant="subtle"
+                          color="red"
+                          onClick={() => {
+                            setDownloading(null)
+                            window.api.invoke('models:cancel-download', m.model)
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </Group>
+                    ) : (
                       <Button
                         size="xs"
-                        variant="subtle"
-                        color="red"
-                        onClick={() => handleDelete(m.model)}
+                        variant="light"
+                        color="indigo"
+                        onClick={() => handleDownload(m.model)}
+                        disabled={downloading !== null}
                       >
-                        Delete
+                        Download
                       </Button>
-                    </>
-                  ) : downloading === m.model ? (
-                    <Group gap="xs">
-                      <Text size="xs" c="dimmed">
-                        {Math.round(downloadProgress)}%
-                      </Text>
-                      <Button
-                        size="xs"
-                        variant="subtle"
-                        color="red"
-                        onClick={() => {
-                          setDownloading(null)
-                          window.api.invoke('models:cancel-download', m.model)
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                    </Group>
-                  ) : (
-                    <Button
-                      size="xs"
-                      variant="light"
-                      onClick={() => handleDownload(m.model)}
-                      disabled={downloading !== null}
-                    >
-                      Download
-                    </Button>
-                  )}
-                </Group>
-              </Group>
-            ))}
-          </Stack>
+                    )}
+                  </Group>
+                </div>
+              ))}
+            </Stack>
+          </div>
         </Stack>
       </div>
     </div>
