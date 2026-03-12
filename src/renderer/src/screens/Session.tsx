@@ -28,6 +28,7 @@ const SPEAKER_COLORS = [
 export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.Element {
   const [session, setSession] = useState<Session | null>(null)
   const [speakers, setSpeakers] = useState<Speaker[]>([])
+  const [downloadedModels, setDownloadedModels] = useState<WhisperModel[]>([])
   const [progress, setProgress] = useState(0)
   const [anchorIdx, setAnchorIdx] = useState<number | null>(null)
   const [focusIdx, setFocusIdx] = useState<number | null>(null)
@@ -35,12 +36,14 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
   const [error, setError] = useState<string | null>(null)
 
   const reload = useCallback(async () => {
-    const [s, sp] = await Promise.all([
+    const [s, sp, modelList] = await Promise.all([
       window.api.invoke('sessions:get', sessionId),
       window.api.invoke('speakers:list'),
+      window.api.invoke('models:list'),
     ])
     setSession(s)
     setSpeakers(sp)
+    setDownloadedModels(modelList.filter((m) => m.downloaded).map((m) => m.model))
   }, [sessionId])
 
   useEffect(() => {
@@ -204,42 +207,48 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
             </p>
             <p className="text-base font-semibold text-gray-800">{fileName}</p>
           </div>
-          <div className="flex gap-4 items-end">
-            <Select
-              label="Model"
-              size="sm"
-              value={session.model}
-              onChange={async (v) => {
-                if (!v) return
-                const updated = await window.api.invoke('sessions:update', sessionId, {
-                  model: v as WhisperModel,
-                })
-                setSession(updated)
-              }}
-              data={['tiny', 'base', 'small', 'medium', 'large']}
-            />
-            <Select
-              label="Language"
-              size="sm"
-              value={session.language}
-              onChange={async (v) => {
-                if (!v) return
-                const updated = await window.api.invoke('sessions:update', sessionId, {
-                  language: v,
-                })
-                setSession(updated)
-              }}
-              data={[
-                { value: 'auto', label: 'auto-detect' },
-                { value: 'ru', label: 'Russian' },
-                { value: 'en', label: 'English' },
-                { value: 'de', label: 'German' },
-                { value: 'fr', label: 'French' },
-                { value: 'es', label: 'Spanish' },
-              ]}
-            />
-          </div>
-          <Button color="indigo" onClick={handleTranscribe}>
+          {downloadedModels.length === 0 ? (
+            <p className="text-xs text-amber-600 text-center max-w-xs">
+              No models downloaded. Go to Settings to download one.
+            </p>
+          ) : (
+            <div className="flex gap-4 items-end">
+              <Select
+                label="Model"
+                size="sm"
+                value={downloadedModels.includes(session.model) ? session.model : downloadedModels[0]}
+                onChange={async (v) => {
+                  if (!v) return
+                  const updated = await window.api.invoke('sessions:update', sessionId, {
+                    model: v as WhisperModel,
+                  })
+                  setSession(updated)
+                }}
+                data={downloadedModels.map((m) => ({ value: m, label: m }))}
+              />
+              <Select
+                label="Language"
+                size="sm"
+                value={session.language}
+                onChange={async (v) => {
+                  if (!v) return
+                  const updated = await window.api.invoke('sessions:update', sessionId, {
+                    language: v,
+                  })
+                  setSession(updated)
+                }}
+                data={[
+                  { value: 'auto', label: 'auto-detect' },
+                  { value: 'ru', label: 'Russian' },
+                  { value: 'en', label: 'English' },
+                  { value: 'de', label: 'German' },
+                  { value: 'fr', label: 'French' },
+                  { value: 'es', label: 'Spanish' },
+                ]}
+              />
+            </div>
+          )}
+          <Button color="indigo" disabled={downloadedModels.length === 0} onClick={handleTranscribe}>
             Transcribe
           </Button>
           {error && (

@@ -1,24 +1,34 @@
 import { useState, useEffect } from 'react'
-import { Text, Button, Stack, Select, Group, Badge, TextInput } from '@mantine/core'
+import { Text, Button, Stack, Select, Group, TextInput, Progress } from '@mantine/core'
 import type { Settings, ModelInfo, WhisperModel } from '../types/ipc'
 
 interface Props {
   onBack: () => void
 }
 
-const MODEL_SIZES: Record<WhisperModel, string> = {
-  tiny: '75 MB',
-  base: '142 MB',
-  small: '466 MB',
-  medium: '1.5 GB',
-  large: '2.9 GB',
+const MODEL_META: Record<WhisperModel, { size: string; note: string; bytes: number }> = {
+  tiny:   { size: '75 MB',   note: 'fast, lower accuracy', bytes: 75 * 1024 * 1024 },
+  base:   { size: '142 MB',  note: 'fast, decent quality', bytes: 142 * 1024 * 1024 },
+  small:  { size: '466 MB',  note: 'good balance',         bytes: 466 * 1024 * 1024 },
+  medium: { size: '1.5 GB',  note: 'recommended',          bytes: 1500 * 1024 * 1024 },
+  large:  { size: '2.9 GB',  note: 'most accurate, slow',  bytes: 2900 * 1024 * 1024 },
+}
+
+interface DownloadState {
+  percent: number
+  bytesPerSec: number
+}
+
+function formatSpeed(bps: number): string {
+  if (bps >= 1024 * 1024) return `${(bps / 1024 / 1024).toFixed(1)} MB/s`
+  if (bps >= 1024) return `${(bps / 1024).toFixed(0)} KB/s`
+  return `${bps} B/s`
 }
 
 export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [models, setModels] = useState<ModelInfo[]>([])
-  const [downloading, setDownloading] = useState<WhisperModel | null>(null)
-  const [downloadProgress, setDownloadProgress] = useState(0)
+  const [downloading, setDownloading] = useState<Map<WhisperModel, DownloadState>>(new Map())
 
   async function reload(): Promise<void> {
     const [s, m] = await Promise.all([
@@ -32,19 +42,35 @@ export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
   useEffect(() => {
     reload()
 
-    const offProgress = window.api.on('models:download-progress', ({ model, percent }) => {
-      setDownloading(model)
-      setDownloadProgress(percent)
+    const offProgress = window.api.on('models:download-progress', ({ model, percent, bytesPerSec }) => {
+      setDownloading((prev) => {
+        const next = new Map(prev)
+        next.set(model, { percent, bytesPerSec })
+        return next
+      })
     })
-    const offDone = window.api.on('models:download-done', () => {
-      setDownloading(null)
-      setDownloadProgress(0)
+
+    const offDone = window.api.on('models:download-done', ({ model }) => {
+      setDownloading((prev) => {
+        const next = new Map(prev)
+        next.delete(model)
+        return next
+      })
       reload()
+    })
+
+    const offError = window.api.on('models:download-error', ({ model }) => {
+      setDownloading((prev) => {
+        const next = new Map(prev)
+        next.delete(model)
+        return next
+      })
     })
 
     return () => {
       offProgress()
       offDone()
+      offError()
     }
   }, [])
 
@@ -54,9 +80,17 @@ export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
   }
 
   async function handleDownload(model: WhisperModel): Promise<void> {
-    setDownloading(model)
-    setDownloadProgress(0)
+    setDownloading((prev) => new Map(prev).set(model, { percent: 0, bytesPerSec: 0 }))
     await window.api.invoke('models:download', model)
+  }
+
+  async function handleCancel(model: WhisperModel): Promise<void> {
+    await window.api.invoke('models:cancel-download', model)
+    setDownloading((prev) => {
+      const next = new Map(prev)
+      next.delete(model)
+      return next
+    })
   }
 
   async function handleDelete(model: WhisperModel): Promise<void> {
@@ -65,6 +99,8 @@ export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
   }
 
   if (!settings) return <div className="h-screen bg-white" />
+
+  const isAnyDownloading = downloading.size > 0
 
   return (
     <div className="flex flex-col h-screen bg-white">
@@ -81,125 +117,158 @@ export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
-        <Stack gap="xl" maw={480}>
-          {/* Defaults */}
-          <Stack gap="md">
-            <Select
-              label="Default model"
-              value={settings.defaultModel}
-              onChange={(v) => v && handleUpdate({ defaultModel: v as WhisperModel })}
-              data={[
-                { value: 'tiny', label: 'tiny (75 MB)' },
-                { value: 'base', label: 'base (142 MB)' },
-                { value: 'small', label: 'small (466 MB)' },
-                { value: 'medium', label: 'medium (1.5 GB)' },
-                { value: 'large', label: 'large (2.9 GB)' },
-              ]}
-            />
-            <Select
-              label="Default language"
-              value={settings.defaultLanguage}
-              onChange={(v) => v && handleUpdate({ defaultLanguage: v })}
-              data={[
-                { value: 'auto', label: 'auto-detect' },
-                { value: 'ru', label: 'Russian' },
-                { value: 'en', label: 'English' },
-                { value: 'de', label: 'German' },
-                { value: 'fr', label: 'French' },
-                { value: 'es', label: 'Spanish' },
-              ]}
-            />
-            <Group align="flex-end" gap="sm">
-              <TextInput
-                label="Storage path"
-                value={settings.storagePath}
-                readOnly
-                flex={1}
-                styles={{ input: { fontFamily: 'monospace', fontSize: 12 } }}
-              />
-              <Button size="sm" variant="default">
-                Change
-              </Button>
-            </Group>
-          </Stack>
+        <Stack gap="xl" maw={520}>
 
-          {/* Divider */}
+          {/* General */}
           <div>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="h-px flex-1 bg-gray-200" />
-              <Text size="xs" c="dimmed" fw={600} tt="uppercase" style={{ letterSpacing: '0.06em' }}>
-                Models
-              </Text>
-              <div className="h-px flex-1 bg-gray-200" />
-            </div>
-
-            <Stack gap="sm">
-              {models.map((m) => (
-                <div
-                  key={m.model}
-                  className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"
-                >
-                  <div className="flex items-center gap-3">
-                    <Text fw={500} size="sm" w={60}>
-                      {m.model}
-                    </Text>
-                    <Text c="dimmed" size="xs">
-                      {MODEL_SIZES[m.model]}
-                    </Text>
-                    {m.model === settings.defaultModel && (
-                      <Badge size="xs" color="indigo" variant="light">
-                        default
-                      </Badge>
-                    )}
-                  </div>
-                  <Group gap="xs">
-                    {m.downloaded ? (
-                      <>
-                        <Badge size="xs" color="teal" variant="light">
-                          downloaded
-                        </Badge>
-                        <Button
-                          size="xs"
-                          variant="subtle"
-                          color="red"
-                          onClick={() => handleDelete(m.model)}
-                        >
-                          Delete
-                        </Button>
-                      </>
-                    ) : downloading === m.model ? (
-                      <Group gap="xs">
-                        <Text size="xs" c="dimmed">
-                          {Math.round(downloadProgress)}%
-                        </Text>
-                        <Button
-                          size="xs"
-                          variant="subtle"
-                          color="red"
-                          onClick={() => {
-                            setDownloading(null)
-                            window.api.invoke('models:cancel-download', m.model)
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                      </Group>
-                    ) : (
-                      <Button
-                        size="xs"
-                        variant="light"
-                        color="indigo"
-                        onClick={() => handleDownload(m.model)}
-                        disabled={downloading !== null}
-                      >
-                        Download
-                      </Button>
-                    )}
-                  </Group>
-                </div>
-              ))}
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
+              General
+            </p>
+            <Stack gap="md">
+              <Select
+                label="Default language"
+                value={settings.defaultLanguage}
+                onChange={(v) => v && handleUpdate({ defaultLanguage: v })}
+                data={[
+                  { value: 'auto', label: 'auto-detect' },
+                  { value: 'ru', label: 'Russian' },
+                  { value: 'en', label: 'English' },
+                  { value: 'de', label: 'German' },
+                  { value: 'fr', label: 'French' },
+                  { value: 'es', label: 'Spanish' },
+                ]}
+              />
+              <Group align="flex-end" gap="sm">
+                <TextInput
+                  label="Storage path"
+                  value={settings.storagePath}
+                  readOnly
+                  flex={1}
+                  styles={{ input: { fontFamily: 'monospace', fontSize: 12 } }}
+                />
+                <Button size="sm" variant="default">
+                  Change
+                </Button>
+              </Group>
             </Stack>
           </div>
+
+          {/* Models */}
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
+              Models
+            </p>
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              {(['tiny', 'base', 'small', 'medium', 'large'] as WhisperModel[]).map((m, idx, arr) => {
+                const info = models.find((x) => x.model === m)
+                const dl = downloading.get(m)
+                const isDownloaded = info?.downloaded ?? false
+                const isDownloading = !!dl
+                const isDefault = settings.defaultModel === m
+                const isLast = idx === arr.length - 1
+
+                return (
+                  <div
+                    key={m}
+                    className={`px-4 py-3 ${!isLast ? 'border-b border-gray-100' : ''}`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      {/* Left: name + meta */}
+                      <div className="flex items-center gap-3 min-w-0">
+                        {/* Status indicator */}
+                        <div
+                          className={`w-2 h-2 rounded-full shrink-0 ${
+                            isDownloaded
+                              ? 'bg-emerald-400'
+                              : isDownloading
+                                ? 'bg-blue-400 animate-pulse'
+                                : 'bg-gray-200'
+                          }`}
+                        />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-900">{m}</span>
+                            <span className="text-xs text-gray-400">{MODEL_META[m].size}</span>
+                            {isDefault && isDownloaded && (
+                              <span className="text-[10px] font-semibold uppercase tracking-wide text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-full">
+                                default
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-400 m-0">{MODEL_META[m].note}</p>
+                        </div>
+                      </div>
+
+                      {/* Right: actions */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        {isDownloading ? (
+                          <>
+                            <Text size="xs" c="dimmed">
+                              {formatSpeed(dl.bytesPerSec)}
+                            </Text>
+                            <Button
+                              size="xs"
+                              variant="subtle"
+                              color="red"
+                              onClick={() => handleCancel(m)}
+                            >
+                              Cancel
+                            </Button>
+                          </>
+                        ) : isDownloaded ? (
+                          <Group gap="xs">
+                            {!isDefault && (
+                              <Button
+                                size="xs"
+                                variant="subtle"
+                                color="indigo"
+                                onClick={() => handleUpdate({ defaultModel: m })}
+                              >
+                                Set default
+                              </Button>
+                            )}
+                            <Button
+                              size="xs"
+                              variant="subtle"
+                              color="red"
+                              onClick={() => handleDelete(m)}
+                            >
+                              Delete
+                            </Button>
+                          </Group>
+                        ) : (
+                          <Button
+                            size="xs"
+                            variant="light"
+                            color="indigo"
+                            disabled={isAnyDownloading}
+                            onClick={() => handleDownload(m)}
+                          >
+                            Download
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Progress bar */}
+                    {isDownloading && (
+                      <div className="mt-2.5">
+                        <Progress
+                          value={dl.percent}
+                          size="xs"
+                          color="indigo"
+                          animated={dl.percent < 100}
+                          radius="xl"
+                        />
+                        <p className="text-[10px] text-gray-400 mt-1 m-0">{dl.percent}% downloaded</p>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
         </Stack>
       </div>
     </div>

@@ -35,18 +35,21 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
   const [sessions, setSessions] = useState<Session[]>([])
   const [speakers, setSpeakers] = useState<Speaker[]>([])
   const [currentModel, setCurrentModel] = useState<WhisperModel>('medium')
+  const [downloadedModels, setDownloadedModels] = useState<WhisperModel[]>([])
   const [newSpeakerName, setNewSpeakerName] = useState('')
   const [addingSpeaker, setAddingSpeaker] = useState(false)
 
   const reload = useCallback(async () => {
-    const [s, sp, settings] = await Promise.all([
+    const [s, sp, settings, modelList] = await Promise.all([
       window.api.invoke('sessions:list'),
       window.api.invoke('speakers:list'),
       window.api.invoke('settings:get'),
+      window.api.invoke('models:list'),
     ])
     setSessions(s)
     setSpeakers(sp)
     setCurrentModel(settings.defaultModel)
+    setDownloadedModels(modelList.filter((m) => m.downloaded).map((m) => m.model))
   }, [])
 
   useEffect(() => {
@@ -88,13 +91,15 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
       <div className="flex items-center justify-between px-5 h-11 border-b border-gray-200 shrink-0">
         <span className="text-sm font-semibold text-gray-900 tracking-tight">scribe</span>
         <Group gap="xs">
-          <Select
-            size="xs"
-            value={currentModel}
-            onChange={handleModelChange}
-            data={['tiny', 'base', 'small', 'medium', 'large']}
-            styles={{ input: { minWidth: 80 } }}
-          />
+          {downloadedModels.length > 0 && (
+            <Select
+              size="xs"
+              value={downloadedModels.includes(currentModel) ? currentModel : downloadedModels[0]}
+              onChange={handleModelChange}
+              data={downloadedModels.map((m) => ({ value: m, label: m }))}
+              styles={{ input: { minWidth: 80 } }}
+            />
+          )}
           <ActionIcon variant="subtle" size="sm" color="gray" onClick={onOpenSettings} title="Settings">
             <span style={{ fontSize: 14 }}>⚙</span>
           </ActionIcon>

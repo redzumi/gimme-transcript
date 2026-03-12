@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Text, Button, Stack, Progress, Group, Badge } from '@mantine/core'
+import { Button, Stack, Progress, Group, Badge } from '@mantine/core'
 import type { WhisperModel, ModelInfo } from '../types/ipc'
+
+function formatSpeed(bps: number): string {
+  if (bps >= 1024 * 1024) return `${(bps / 1024 / 1024).toFixed(1)} MB/s`
+  if (bps >= 1024) return `${(bps / 1024).toFixed(0)} KB/s`
+  return `${bps} B/s`
+}
 
 interface Props {
   onDone: () => void
@@ -19,17 +25,22 @@ export default function FirstLaunch({ onDone }: Props): React.JSX.Element {
   const [selected, setSelected] = useState<WhisperModel>('medium')
   const [downloading, setDownloading] = useState(false)
   const [progress, setProgress] = useState(0)
+  const [speed, setSpeed] = useState(0)
 
   useEffect(() => {
     window.api.invoke('models:list').then(setModels)
 
-    const offProgress = window.api.on('models:download-progress', ({ model, percent }) => {
-      if (model === selected) setProgress(percent)
+    const offProgress = window.api.on('models:download-progress', ({ model, percent, bytesPerSec }) => {
+      if (model === selected) {
+        setProgress(percent)
+        setSpeed(bytesPerSec)
+      }
     })
     const offDone = window.api.on('models:download-done', ({ model }) => {
       if (model === selected) {
         setDownloading(false)
         setProgress(100)
+        setSpeed(0)
         window.api.invoke('models:list').then(setModels)
       }
     })
@@ -123,9 +134,12 @@ export default function FirstLaunch({ onDone }: Props): React.JSX.Element {
             <Stack gap="xs">
               <Progress value={progress} animated size="sm" color="indigo" radius="xl" />
               <Group justify="space-between">
-                <Text size="xs" c="dimmed">
-                  Downloading {selected}… {Math.round(progress)}%
-                </Text>
+                <span className="text-xs text-gray-400">
+                  {Math.round(progress)}%
+                  {speed > 0 && (
+                    <span className="ml-2 text-gray-300">{formatSpeed(speed)}</span>
+                  )}
+                </span>
                 <Button size="xs" variant="subtle" color="red" onClick={handleCancel}>
                   Cancel
                 </Button>
