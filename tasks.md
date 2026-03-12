@@ -50,25 +50,25 @@ Each screen is independent after Phase 0–1 are done.
 
 ## Phase 4: Speaker Labeling
 
-- [ ] **T-040** SpeakerPicker component (dropdown with existing speakers + "Add new" inline)
-- [ ] **T-041** Bulk assign UI (multi-select segments → assign speaker)
-- [ ] **T-042** Persist speaker assignments to session JSON on every change
+- [x] **T-040** SpeakerPicker component (dropdown with existing speakers + "Add new" inline)
+- [x] **T-041** Bulk assign UI (multi-select segments → assign speaker)
+- [x] **T-042** Persist speaker assignments to session JSON on every change
 
 ---
 
 ## Phase 5: Export
 
-- [ ] **T-050** Export single session to Markdown
-- [ ] **T-051** Export single session to plain text
-- [ ] **T-052** Merge multiple sessions → export as one document (MD or TXT)
-- [ ] **T-053** Export file dialog (native, via Electron `dialog.showSaveDialog`)
+- [x] **T-050** Export single session to Markdown
+- [x] **T-051** Export single session to plain text
+- [x] **T-052** Merge multiple sessions → export as one document (MD or TXT)
+- [x] **T-053** Export file dialog (native, via Electron `dialog.showSaveDialog`)
 
 ---
 
 ## Phase 6: Polish
 
-- [ ] **T-060** Header model switcher (quick model change without going to Settings)
-- [ ] **T-061** Session status badges (idle / transcribing / done / labeled)
-- [ ] **T-062** Empty states (no sessions, no speakers)
-- [ ] **T-063** Error handling (transcription failed, model not found, file unreadable)
-- [ ] **T-064** First-launch detection (skip Screen 0 if model already downloaded)
+- [x] **T-060** Header model switcher (quick model change without going to Settings)
+- [x] **T-061** Session status badges (idle / transcribing / done / labeled)
+- [x] **T-062** Empty states (no sessions, no speakers)
+- [x] **T-063** Error handling (transcription failed, model not found, file unreadable)
+- [x] **T-064** First-launch detection (skip Screen 0 if model already downloaded)

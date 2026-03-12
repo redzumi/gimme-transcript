@@ -158,13 +158,22 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
                           {s.audioFile.split('/').pop() ?? s.audioFile}
                         </Text>
                         <Group gap="xs" mt={2}>
-                          <Badge
-                            size="xs"
-                            color={STATUS_COLOR[s.status]}
-                            variant="light"
-                          >
-                            {STATUS_LABEL[s.status]}
-                          </Badge>
+                          {(() => {
+                            const isLabeled = s.status === 'done' && s.segments.length > 0 && s.segments.every(seg => seg.speakerId !== null)
+                            const displayStatus = isLabeled ? 'labeled' : s.status
+                            const badgeColor = isLabeled ? 'teal' : STATUS_COLOR[s.status]
+                            const badgeLabel = isLabeled ? 'labeled' : STATUS_LABEL[s.status]
+                            return (
+                              <Badge
+                                size="xs"
+                                color={badgeColor}
+                                variant="light"
+                                data-display-status={displayStatus}
+                              >
+                                {badgeLabel}
+                              </Badge>
+                            )
+                          })()}
                           <Text size="xs" c="dimmed">
                             {formatAgo(s.createdAt)}
                           </Text>

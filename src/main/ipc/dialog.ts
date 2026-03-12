@@ -22,4 +22,9 @@ export function registerDialogHandlers(): void {
     })
     return result.canceled ? null : result.filePath
   })
+
+  ipcMain.handle('export:write', async (_e, filePath: string, content: string) => {
+    const { writeFile } = await import('fs/promises')
+    await writeFile(filePath, content, 'utf8')
+  })
 }

@@ -76,6 +76,9 @@ export interface IpcInvokeMap {
   // Native dialogs
   'dialog:open-audio': { args: []; return: string[] | null }
   'dialog:save': { args: [defaultName: string]; return: string | null }
+
+  // File export
+  'export:write': { args: [filePath: string, content: string]; return: void }
 }
 
 export type IpcInvokeChannel = keyof IpcInvokeMap

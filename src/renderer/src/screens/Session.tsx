@@ -11,7 +11,8 @@ import {
   Popover,
   Badge,
   Divider,
-  Checkbox
+  Checkbox,
+  Modal
 } from '@mantine/core'
 import type { Session, Segment, Speaker, WhisperModel } from '../types/ipc'
 
@@ -31,6 +32,8 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
   const [speakers, setSpeakers] = useState<Speaker[]>([])
   const [progress, setProgress] = useState(0)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [mergeOpen, setMergeOpen] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const reload = useCallback(async () => {
     const [s, sp] = await Promise.all([
@@ -61,14 +64,22 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
       reload()
     })
 
+    const offError = window.api.on('whisper:error', ({ sessionId: sid, message }) => {
+      if (sid !== sessionId) return
+      setSession((prev) => prev ? { ...prev, status: 'idle' } : prev)
+      setError(message)
+    })
+
     return () => {
       offSegment()
       offProgress()
       offDone()
+      offError()
     }
   }, [sessionId, reload])
 
   async function handleTranscribe(): Promise<void> {
+    setError(null)
     setSession((prev) => prev ? { ...prev, status: 'transcribing' } : prev)
     await window.api.invoke('whisper:transcribe', sessionId)
     reload()
@@ -179,6 +190,9 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
           <Button size="md" onClick={handleTranscribe}>
             Transcribe
           </Button>
+          {error && (
+            <Text size="xs" c="red" ta="center" px="xl">{error}</Text>
+          )}
         </div>
       )}
 
@@ -230,10 +244,20 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
           <div className="border-t border-white/10 px-5 py-3">
             <Group justify="space-between">
               <ExportButton sessionId={sessionId} session={session} speakers={speakers} label="Export this file" />
+              <Button size="sm" variant="light" color="indigo" onClick={() => setMergeOpen(true)}>
+                Merge &amp; Export
+              </Button>
             </Group>
           </div>
         </>
       )}
+
+      <MergeExportModal
+        opened={mergeOpen}
+        onClose={() => setMergeOpen(false)}
+        currentSessionId={sessionId}
+        speakers={speakers}
+      />
     </div>
   )
 }
@@ -453,9 +477,7 @@ function ExportButton({ session, speakers, label }: ExportButtonProps): React.JS
     const savePath = await window.api.invoke('dialog:save', `${fileName}.${format}`)
     if (!savePath) return
     const content = format === 'md' ? buildMd() : buildTxt()
-    // Write via IPC is not wired yet — use Electron's fs from main
-    // For now log; T-050/T-051 will wire this properly
-    console.log('Export to:', savePath, content.length, 'chars')
+    await window.api.invoke('export:write', savePath, content)
   }
 
   return (
@@ -476,5 +498,103 @@ function ExportButton({ session, speakers, label }: ExportButtonProps): React.JS
         </Stack>
       </Popover.Dropdown>
     </Popover>
+  )
+}
+
+// ─── MergeExportModal ─────────────────────────────────────────────────────────
+
+interface MergeExportModalProps {
+  opened: boolean
+  onClose: () => void
+  currentSessionId: string
+  speakers: Speaker[]
+}
+
+function MergeExportModal({ opened, onClose, currentSessionId, speakers }: MergeExportModalProps): React.JSX.Element {
+  const [sessions, setSessions] = useState<Session[]>([])
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (!opened) return
+    window.api.invoke('sessions:list').then((all) => {
+      const done = all.filter((s) => s.status === 'done')
+      setSessions(done)
+      setCheckedIds(new Set(done.map((s) => s.id).filter((id) => id === currentSessionId)))
+    })
+  }, [opened, currentSessionId])
+
+  function toggleSession(id: string): void {
+    setCheckedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function buildMergedSegments(): Segment[] {
+    return sessions
+      .filter((s) => checkedIds.has(s.id))
+      .flatMap((s) => s.segments)
+  }
+
+  function buildMd(): string {
+    const lines: string[] = []
+    for (const seg of buildMergedSegments()) {
+      const sp = speakers.find((s) => s.id === seg.speakerId)
+      const name = sp?.name ?? 'Unknown'
+      lines.push(`**${name}** [${formatTime(seg.start)}]`)
+      lines.push(seg.text.trim())
+      lines.push('')
+    }
+    return lines.join('\n')
+  }
+
+  function buildTxt(): string {
+    return buildMergedSegments()
+      .map((seg) => {
+        const sp = speakers.find((s) => s.id === seg.speakerId)
+        return `[${formatTime(seg.start)}] ${sp?.name ?? 'Unknown'}: ${seg.text.trim()}`
+      })
+      .join('\n')
+  }
+
+  async function handleExport(format: 'md' | 'txt'): Promise<void> {
+    onClose()
+    const savePath = await window.api.invoke('dialog:save', `merged.${format}`)
+    if (!savePath) return
+    const content = format === 'md' ? buildMd() : buildTxt()
+    await window.api.invoke('export:write', savePath, content)
+  }
+
+  return (
+    <Modal opened={opened} onClose={onClose} title="Merge & Export" centered>
+      <Stack gap="sm">
+        <Text size="sm" c="dimmed">Select sessions to merge:</Text>
+        {sessions.map((s) => (
+          <Checkbox
+            key={s.id}
+            checked={checkedIds.has(s.id)}
+            onChange={() => toggleSession(s.id)}
+            label={
+              <Text size="sm">
+                {s.audioFile.split('/').pop() ?? s.audioFile}
+              </Text>
+            }
+          />
+        ))}
+        {sessions.length === 0 && (
+          <Text size="sm" c="dimmed" ta="center">No completed sessions found.</Text>
+        )}
+        <Group justify="flex-end" mt="sm">
+          <Button size="sm" variant="light" disabled={checkedIds.size === 0} onClick={() => handleExport('md')}>
+            Export as Markdown
+          </Button>
+          <Button size="sm" variant="light" disabled={checkedIds.size === 0} onClick={() => handleExport('txt')}>
+            Export as Text
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
   )
 }
