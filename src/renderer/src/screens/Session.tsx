@@ -741,7 +741,7 @@ function ExportButton({ session, speakers }: ExportButtonProps): React.JSX.Eleme
     const lines: string[] = []
     for (const seg of session.segments) {
       const sp = speakers.find((s) => s.id === seg.speakerId)
-      const time = seg.start > 0 ? ` [${formatTime(seg.start)}]` : ''
+      const time = ` [${formatTime(seg.start)}]`
       lines.push(`**${sp?.name ?? 'Unknown'}**${time}`)
       lines.push(seg.text.trim())
       lines.push('')
@@ -753,8 +753,7 @@ function ExportButton({ session, speakers }: ExportButtonProps): React.JSX.Eleme
     return session.segments
       .map((seg) => {
         const sp = speakers.find((s) => s.id === seg.speakerId)
-        const time = seg.start > 0 ? `[${formatTime(seg.start)}] ` : ''
-        return `${time}${sp?.name ?? 'Unknown'}: ${seg.text.trim()}`
+        return `[${formatTime(seg.start)}] ${sp?.name ?? 'Unknown'}: ${seg.text.trim()}`
       })
       .join('\n')
   }
@@ -840,7 +839,7 @@ function MergeExportModal({
     const lines: string[] = []
     for (const seg of mergedSegments()) {
       const sp = speakers.find((s) => s.id === seg.speakerId)
-      const time = seg.start > 0 ? ` [${formatTime(seg.start)}]` : ''
+      const time = ` [${formatTime(seg.start)}]`
       lines.push(`**${sp?.name ?? 'Unknown'}**${time}`)
       lines.push(seg.text.trim())
       lines.push('')
@@ -852,8 +851,7 @@ function MergeExportModal({
     return mergedSegments()
       .map((seg) => {
         const sp = speakers.find((s) => s.id === seg.speakerId)
-        const time = seg.start > 0 ? `[${formatTime(seg.start)}] ` : ''
-        return `${time}${sp?.name ?? 'Unknown'}: ${seg.text.trim()}`
+        return `[${formatTime(seg.start)}] ${sp?.name ?? 'Unknown'}: ${seg.text.trim()}`
       })
       .join('\n')
   }
