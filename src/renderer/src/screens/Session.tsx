@@ -406,6 +406,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
         <span className="flex-1 truncate text-sm font-medium text-[#5b4653]">{sessionName}</span>
         {session.status === 'done' && (
           <Group gap="xs">
+            <CopyButton session={session} speakers={speakers} />
             <ExportButton session={session} speakers={speakers} />
             <Button
               size="xs"
@@ -734,29 +735,45 @@ interface ExportButtonProps {
   speakers: Speaker[]
 }
 
+function buildMarkdown(segments: Segment[], speakers: Speaker[]): string {
+  const lines: string[] = []
+  for (const seg of segments) {
+    const sp = speakers.find((s) => s.id === seg.speakerId)
+    const time = ` [${formatTime(seg.start)}]`
+    lines.push(`**${sp?.name ?? 'Unknown'}**${time}`)
+    lines.push(seg.text.trim())
+    lines.push('')
+  }
+  return lines.join('\n')
+}
+
+function buildPlainText(segments: Segment[], speakers: Speaker[]): string {
+  return segments
+    .map((seg) => {
+      const sp = speakers.find((s) => s.id === seg.speakerId)
+      return `[${formatTime(seg.start)}] ${sp?.name ?? 'Unknown'}: ${seg.text.trim()}`
+    })
+    .join('\n')
+}
+
+function CopyButton({ session, speakers }: ExportButtonProps): React.JSX.Element {
+  const [copied, setCopied] = useState(false)
+
+  async function handleCopy(): Promise<void> {
+    await navigator.clipboard.writeText(buildPlainText(session.segments, speakers))
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1600)
+  }
+
+  return (
+    <Button size="xs" variant="light" color="sunset" onClick={() => void handleCopy()}>
+      {copied ? 'Copied' : 'Copy'}
+    </Button>
+  )
+}
+
 function ExportButton({ session, speakers }: ExportButtonProps): React.JSX.Element {
   const [open, setOpen] = useState(false)
-
-  function buildMd(): string {
-    const lines: string[] = []
-    for (const seg of session.segments) {
-      const sp = speakers.find((s) => s.id === seg.speakerId)
-      const time = ` [${formatTime(seg.start)}]`
-      lines.push(`**${sp?.name ?? 'Unknown'}**${time}`)
-      lines.push(seg.text.trim())
-      lines.push('')
-    }
-    return lines.join('\n')
-  }
-
-  function buildTxt(): string {
-    return session.segments
-      .map((seg) => {
-        const sp = speakers.find((s) => s.id === seg.speakerId)
-        return `[${formatTime(seg.start)}] ${sp?.name ?? 'Unknown'}: ${seg.text.trim()}`
-      })
-      .join('\n')
-  }
 
   async function handleExport(format: 'md' | 'txt'): Promise<void> {
     setOpen(false)
@@ -769,7 +786,13 @@ function ExportButton({ session, speakers }: ExportButtonProps): React.JSX.Eleme
       'transcript'
     const savePath = await window.api.invoke('dialog:save', `${base}.${format}`, format)
     if (!savePath) return
-    await window.api.invoke('export:write', savePath, format === 'md' ? buildMd() : buildTxt())
+    await window.api.invoke(
+      'export:write',
+      savePath,
+      format === 'md'
+        ? buildMarkdown(session.segments, speakers)
+        : buildPlainText(session.segments, speakers)
+    )
   }
 
   return (
@@ -835,32 +858,16 @@ function MergeExportModal({
     return sessions.filter((s) => checkedIds.has(s.id)).flatMap((s) => s.segments)
   }
 
-  function buildMd(): string {
-    const lines: string[] = []
-    for (const seg of mergedSegments()) {
-      const sp = speakers.find((s) => s.id === seg.speakerId)
-      const time = ` [${formatTime(seg.start)}]`
-      lines.push(`**${sp?.name ?? 'Unknown'}**${time}`)
-      lines.push(seg.text.trim())
-      lines.push('')
-    }
-    return lines.join('\n')
-  }
-
-  function buildTxt(): string {
-    return mergedSegments()
-      .map((seg) => {
-        const sp = speakers.find((s) => s.id === seg.speakerId)
-        return `[${formatTime(seg.start)}] ${sp?.name ?? 'Unknown'}: ${seg.text.trim()}`
-      })
-      .join('\n')
-  }
-
   async function handleExport(format: 'md' | 'txt'): Promise<void> {
     onClose()
     const savePath = await window.api.invoke('dialog:save', `merged.${format}`, format)
     if (!savePath) return
-    await window.api.invoke('export:write', savePath, format === 'md' ? buildMd() : buildTxt())
+    const segments = mergedSegments()
+    await window.api.invoke(
+      'export:write',
+      savePath,
+      format === 'md' ? buildMarkdown(segments, speakers) : buildPlainText(segments, speakers)
+    )
   }
 
   return (
