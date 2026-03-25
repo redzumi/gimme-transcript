@@ -1,6 +1,12 @@
 // Prepare audio for whisper-cli.
-// Formats natively supported by whisper-cli: flac, mp3, ogg, wav — passed directly.
-// Everything else is converted to 16kHz mono WAV via ffmpeg (async, non-blocking).
+//
+// NOTE:
+// Even though whisper.cpp may claim to support some formats natively,
+// real-world files (and certain builds/decoder paths) can fail to decode.
+// To keep transcription robust, we convert to 16kHz mono WAV for anything
+// except clearly safe formats.
+//
+// In practice: convert most containers/codecs via ffmpeg; keep wav/mp3/flac as-is.
 
 import { execSync, spawn } from 'child_process'
 import { existsSync } from 'fs'
@@ -8,7 +14,7 @@ import { join } from 'path'
 import { tmpdir } from 'os'
 import { randomUUID } from 'crypto'
 
-const NATIVE_FORMATS = new Set(['wav', 'mp3', 'ogg', 'flac'])
+const NATIVE_FORMATS = new Set(['wav', 'mp3', 'flac'])
 
 function ext(filePath: string): string {
   return filePath.toLowerCase().split('.').pop() ?? ''
