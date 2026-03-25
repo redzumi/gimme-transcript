@@ -395,7 +395,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
         </div>
       </Modal>
 
-      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-[#ead7cf] bg-white/70 px-4 backdrop-blur-sm">
+      <div className="relative z-[60] flex h-12 shrink-0 items-center gap-2 border-b border-[#ead7cf] bg-white/70 px-4 backdrop-blur-sm">
         <button
           className="rounded px-1.5 py-1 text-xs text-[#8f7982] transition-colors hover:bg-[#fff2eb] hover:text-[#24191f]"
           onClick={onBack}
@@ -779,7 +779,7 @@ function ExportButton({ session, speakers }: ExportButtonProps): React.JSX.Eleme
         Export ▾
       </Button>
       {open && (
-        <div className="absolute right-0 top-full z-10 mt-1 min-w-[140px] rounded-xl border border-[#edd8ce] bg-white/95 py-1 shadow-[0_18px_48px_rgba(77,42,66,0.14)] backdrop-blur-sm">
+        <div className="absolute right-0 top-full z-[60] mt-1 min-w-[140px] rounded-xl border border-[#edd8ce] bg-white/95 py-1 shadow-[0_18px_48px_rgba(77,42,66,0.14)] backdrop-blur-sm">
           <button
             className="w-full px-3 py-2 text-left text-xs text-[#5b4653] transition-colors hover:bg-[#fff4ee]"
             onClick={() => handleExport('md')}
