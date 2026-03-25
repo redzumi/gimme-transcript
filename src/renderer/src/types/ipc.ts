@@ -80,7 +80,7 @@ export interface IpcInvokeMap {
   // Native dialogs
   'dialog:open-audio': { args: []; return: string[] | null }
   'dialog:open-text': { args: []; return: { path: string; content: string } | null }
-  'dialog:save': { args: [defaultName: string]; return: string | null }
+  'dialog:save': { args: [defaultName: string, format: 'md' | 'txt']; return: string | null }
 
   // Audio conversion
   'audio:convert': { args: [sessionId: string]; return: void }

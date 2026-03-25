@@ -768,7 +768,7 @@ function ExportButton({ session, speakers }: ExportButtonProps): React.JSX.Eleme
         .pop()
         ?.replace(/\.[^.]+$/, '') ??
       'transcript'
-    const savePath = await window.api.invoke('dialog:save', `${base}.${format}`)
+    const savePath = await window.api.invoke('dialog:save', `${base}.${format}`, format)
     if (!savePath) return
     await window.api.invoke('export:write', savePath, format === 'md' ? buildMd() : buildTxt())
   }
@@ -860,7 +860,7 @@ function MergeExportModal({
 
   async function handleExport(format: 'md' | 'txt'): Promise<void> {
     onClose()
-    const savePath = await window.api.invoke('dialog:save', `merged.${format}`)
+    const savePath = await window.api.invoke('dialog:save', `merged.${format}`, format)
     if (!savePath) return
     await window.api.invoke('export:write', savePath, format === 'md' ? buildMd() : buildTxt())
   }

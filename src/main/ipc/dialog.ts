@@ -5,20 +5,38 @@ export function registerDialogHandlers(): void {
     const win = BrowserWindow.fromWebContents(event.sender)
     const result = await dialog.showOpenDialog(win ?? BrowserWindow.getFocusedWindow()!, {
       title: 'Select audio file(s)',
-      filters: [{ name: 'Audio', extensions: ['mp3', 'm4a', 'wav', 'ogg', 'qta', 'flac', 'aac', 'opus', 'wma', 'aiff', 'aif', 'webm', 'mkv'] }],
+      filters: [
+        {
+          name: 'Audio',
+          extensions: [
+            'mp3',
+            'm4a',
+            'wav',
+            'ogg',
+            'qta',
+            'flac',
+            'aac',
+            'opus',
+            'wma',
+            'aiff',
+            'aif',
+            'webm',
+            'mkv'
+          ]
+        }
+      ],
       properties: ['openFile', 'multiSelections']
     })
     return result.canceled ? null : result.filePaths
   })
 
-  ipcMain.handle('dialog:save', async (event, defaultName: string) => {
+  ipcMain.handle('dialog:save', async (event, defaultName: string, format: 'md' | 'txt') => {
     const win = BrowserWindow.fromWebContents(event.sender)
+    const extension = format === 'md' ? 'md' : 'txt'
+    const filterName = format === 'md' ? 'Markdown' : 'Text'
     const result = await dialog.showSaveDialog(win ?? BrowserWindow.getFocusedWindow()!, {
       defaultPath: defaultName,
-      filters: [
-        { name: 'Markdown', extensions: ['md'] },
-        { name: 'Text', extensions: ['txt'] }
-      ]
+      filters: [{ name: filterName, extensions: [extension] }]
     })
     return result.canceled ? null : result.filePath
   })
