@@ -40,6 +40,7 @@
     "prepare": "husky",
     "postinstall": "electron-builder install-app-deps",
     "screenshots": "npm run build && node scripts/capture-screenshots.mjs",
+    "build:icons": "node scripts/build-icons.js",
     "whisper:setup": "node scripts/build-whisper.mjs",
     "prebuild:mac": "node scripts/build-whisper.mjs",
     "build:mac": "electron-vite build && electron-builder --mac",
