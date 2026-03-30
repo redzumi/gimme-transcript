@@ -1,7 +1,7 @@
 # Gimme Transcript — Task Breakdown
 
-Атомарные задачи для агентов. Каждая задача независима и имеет чёткий результат.
-Порядок важен внутри фаз — между фазами можно параллелить.
+Atomic tasks for agents. Each task is independent and has a clear result.
+Order matters within phases — between phases can be parallelized.
 
 ---
 

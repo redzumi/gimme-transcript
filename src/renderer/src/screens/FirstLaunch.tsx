@@ -17,7 +17,7 @@ const MODEL_LABELS: Record<WhisperModel, { size: string; note: string }> = {
   tiny: { size: '75 MB', note: 'fast, less accurate' },
   base: { size: '142 MB', note: 'fast, decent quality' },
   small: { size: '466 MB', note: 'good balance' },
-  medium: { size: '1.5 GB', note: 'recommended for Russian' },
+  medium: { size: '1.5 GB', note: 'recommended' },
   large: { size: '2.9 GB', note: 'slow, most accurate' }
 }
 
