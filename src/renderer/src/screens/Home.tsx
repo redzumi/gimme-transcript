@@ -89,9 +89,15 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
       setSessions((prev) => prev.map((s) => (s.id === sessionId ? { ...s, status: 'done' } : s)))
     })
 
+    const offRecorded = window.api.on('recording:session-created', ({ session }) => {
+      setSessions((prev) => [session, ...prev])
+      onOpenSession(session.id)
+    })
+
     return () => {
       offProgress()
       offDone()
+      offRecorded()
     }
   }, [reload])
 
@@ -148,6 +154,11 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
       status: 'done'
     })
     setSessions((prev) => [updated, ...prev])
+  }
+
+  async function handleRecord(): Promise<void> {
+    setNewMenuOpen(false)
+    await window.api.invoke('recording:open')
   }
 
   async function handleDeleteSession(e: React.MouseEvent, id: string): Promise<void> {
@@ -305,6 +316,13 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
                     onClick={handleEmptySession}
                   >
                     Empty session
+                  </button>
+                  <div className="my-1 border-t border-[#f3e5dd]" />
+                  <button
+                    className="w-full px-3 py-2 text-left text-sm text-[#5b4653] transition-colors hover:bg-[#fff4ee]"
+                    onClick={handleRecord}
+                  >
+                    Record conversation
                   </button>
                 </div>
               )}
