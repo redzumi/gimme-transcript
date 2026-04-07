@@ -1,5 +1,5 @@
 import { ipcMain, systemPreferences, shell, BrowserWindow, desktopCapturer } from 'electron'
-import { openRecordingWindow } from '../window/recording'
+import { openRecordingWindow, closeRecordingWindow } from '../window/recording'
 import { writeFileSync, appendFileSync, existsSync, statSync, unlinkSync } from 'fs'
 import { randomUUID } from 'crypto'
 import log from 'electron-log'
@@ -142,5 +142,9 @@ export function registerRecordingHandlers(): void {
     if (existsSync(mic)) unlinkSync(mic)
     if (existsSync(speaker)) unlinkSync(speaker)
     log.info('[RECORDING] cancelled', { sessionId })
+  })
+
+  ipcMain.on('recording:close-window', () => {
+    closeRecordingWindow()
   })
 }
