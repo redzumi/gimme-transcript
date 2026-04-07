@@ -39,7 +39,7 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 function getSessionName(s: Session): string {
-  return s.name ?? s.audioFile.split('/').pop() ?? s.audioFile
+  return s.name ?? s.audioSources[0]?.path.split('/').pop() ?? 'Session'
 }
 
 export default function Home({ onOpenSession, onOpenSettings }: Props): React.JSX.Element {

@@ -18,11 +18,15 @@ export function registerAudioHandlers(): void {
 
     const outputPath = join(getSessionsDir(), `${sessionId}_audio.mp3`)
 
-    await convertForPlayback(session.audioFile, outputPath, (percent) => {
+    const primaryPath = session.audioSources[0]?.path ?? ''
+    await convertForPlayback(primaryPath, outputPath, (percent) => {
       broadcast('audio:convert-progress', { sessionId, percent })
     })
 
-    const updated = updateSession(sessionId, { convertedAudioPath: outputPath, audioConvertedCBR: true })
+    const updated = updateSession(sessionId, {
+      convertedAudioPath: outputPath,
+      audioConvertedCBR: true
+    })
     broadcast('audio:convert-done', { sessionId, convertedAudioPath: updated.convertedAudioPath })
   })
 
@@ -30,7 +34,11 @@ export function registerAudioHandlers(): void {
     const session = getSession(sessionId)
     if (!session) return
     if (session.convertedAudioPath && existsSync(session.convertedAudioPath)) {
-      try { unlinkSync(session.convertedAudioPath) } catch { /* ignore */ }
+      try {
+        unlinkSync(session.convertedAudioPath)
+      } catch {
+        /* ignore */
+      }
     }
     updateSession(sessionId, { convertedAudioPath: undefined, audioConvertedCBR: undefined })
   })

@@ -38,7 +38,8 @@ export async function transcribeSession(sessionId: string): Promise<void> {
   const mPath = modelPath(actualModel)
 
   // Convert audio if needed (async, non-blocking)
-  const { audioPath, tempFile } = await prepareAudio(session.audioFile)
+  const primaryPath = session.audioSources[0]?.path ?? ''
+  const { audioPath, tempFile } = await prepareAudio(primaryPath)
 
   updateSession(sessionId, { status: 'transcribing', segments: [], model: actualModel })
 

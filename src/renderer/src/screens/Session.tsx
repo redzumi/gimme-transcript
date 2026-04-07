@@ -224,9 +224,9 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
     setEditingId(null)
   }
 
-  const hasAudio = !!session?.audioFile && session.audioFile !== ''
+  const hasAudio = (session?.audioSources?.[0]?.path ?? '') !== ''
   const audioSrc = hasAudio
-    ? 'file://' + encodeURI(session?.convertedAudioPath ?? session?.audioFile ?? '')
+    ? 'file://' + encodeURI(session?.convertedAudioPath ?? session?.audioSources?.[0]?.path ?? '')
     : undefined
 
   function playSegment(seg: Segment): void {
@@ -251,7 +251,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
       playSegment(seg)
       return
     }
-    const ext = session.audioFile.split('.').pop()?.toLowerCase() ?? ''
+    const ext = (session.audioSources[0]?.path ?? '').split('.').pop()?.toLowerCase() ?? ''
     if (SUPPORTED_EXTS.has(ext)) {
       playSegment(seg)
       return
@@ -300,7 +300,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
 
   if (!session) return <div className="h-screen bg-[var(--app-shell)]" />
 
-  const sessionName = session.name ?? session.audioFile.split('/').pop() ?? session.audioFile
+  const sessionName = session.name ?? session.audioSources[0]?.path.split('/').pop() ?? 'Session'
   const showTranscript = session.status === 'transcribing' || session.status === 'done'
 
   return (
@@ -779,7 +779,7 @@ function ExportButton({ session, speakers }: ExportButtonProps): React.JSX.Eleme
     setOpen(false)
     const base =
       session.name ??
-      session.audioFile
+      (session.audioSources[0]?.path ?? '')
         .split('/')
         .pop()
         ?.replace(/\.[^.]+$/, '') ??
@@ -881,7 +881,11 @@ function MergeExportModal({
             key={s.id}
             checked={checkedIds.has(s.id)}
             onChange={() => toggle(s.id)}
-            label={<Text size="sm">{s.name ?? s.audioFile.split('/').pop() ?? s.audioFile}</Text>}
+            label={
+              <Text size="sm">
+                {s.name ?? s.audioSources[0]?.path.split('/').pop() ?? 'Session'}
+              </Text>
+            }
           />
         ))}
         {sessions.length === 0 && (
