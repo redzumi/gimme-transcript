@@ -298,6 +298,12 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
     await window.api.invoke('whisper:transcribe', sessionId)
   }
 
+  async function handleTranscribeAll(): Promise<void> {
+    setError(null)
+    setSession((prev) => (prev ? { ...prev, status: 'transcribing' } : prev))
+    await window.api.invoke('whisper:transcribe-all', sessionId)
+  }
+
   if (!session) return <div className="h-screen bg-[var(--app-shell)]" />
 
   const sessionName = session.name ?? session.audioSources[0]?.path.split('/').pop() ?? 'Session'
@@ -494,13 +500,35 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
               />
             </div>
           )}
-          <Button
-            color="sunset"
-            disabled={downloadedModels.length === 0}
-            onClick={handleTranscribe}
-          >
-            Transcribe
-          </Button>
+          {session.audioSources.length > 1 ? (
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-full max-w-xs flex flex-col gap-1.5">
+                {session.audioSources.map((src) => (
+                  <div
+                    key={src.id}
+                    className="flex items-center justify-between rounded-lg border border-[#edd8ce] bg-white/70 px-3 py-2"
+                  >
+                    <span className="text-xs text-[#5b4653] truncate">{src.label}</span>
+                  </div>
+                ))}
+              </div>
+              <Button
+                color="sunset"
+                disabled={downloadedModels.length === 0}
+                onClick={handleTranscribeAll}
+              >
+                Transcribe All Sources
+              </Button>
+            </div>
+          ) : (
+            <Button
+              color="sunset"
+              disabled={downloadedModels.length === 0}
+              onClick={handleTranscribe}
+            >
+              Transcribe
+            </Button>
+          )}
           {error && <p className="text-xs text-red-500 text-center max-w-xs px-4">{error}</p>}
         </div>
       )}
