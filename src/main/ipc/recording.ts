@@ -1,4 +1,5 @@
 import { ipcMain, systemPreferences, shell, BrowserWindow, desktopCapturer } from 'electron'
+import { openRecordingWindow } from '../window/recording'
 import { writeFileSync, appendFileSync, existsSync, statSync, unlinkSync } from 'fs'
 import { randomUUID } from 'crypto'
 import log from 'electron-log'
@@ -27,6 +28,11 @@ function upsertRecordingSpeakers(): { micSpeakerId: string; systemSpeakerId: str
 }
 
 export function registerRecordingHandlers(): void {
+  // Open recording window from main window
+  ipcMain.handle('recording:open', () => {
+    openRecordingWindow()
+  })
+
   // Check OS-level permissions
   ipcMain.handle('recording:check-permissions', async () => {
     if (process.platform === 'darwin') {
