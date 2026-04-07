@@ -510,11 +510,6 @@ function upsertRecordingSpeakers(): { micSpeakerId: string; systemSpeakerId: str
 }
 
 export function registerRecordingHandlers(): void {
-  // Open recording window from main window
-  ipcMain.handle('recording:open', () => {
-    openRecordingWindow()
-  })
-
   // Check OS-level permissions
   ipcMain.handle('recording:check-permissions', async () => {
     if (process.platform === 'darwin') {
@@ -675,15 +670,7 @@ session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) =
 })
 ```
 
-- [ ] **Step 5: Run typecheck**
-
-```bash
-npm run typecheck
-```
-
-Expected: no errors.
-
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add src/main/storage/paths.ts src/main/ipc/recording.ts src/main/ipc/index.ts src/main/index.ts
@@ -768,10 +755,31 @@ export function getRecordingWindow(): BrowserWindow | null {
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [ ] **Step 2: Add `recording:open` handler to ipc/recording.ts**
+
+Now that `window/recording.ts` exists, add the import and handler to `src/main/ipc/recording.ts`:
+
+```typescript
+import { openRecordingWindow } from '../window/recording'
+
+// Add inside registerRecordingHandlers(), as the first handler:
+ipcMain.handle('recording:open', () => {
+  openRecordingWindow()
+})
+```
+
+- [ ] **Step 3: Run typecheck**
 
 ```bash
-git add src/main/window/recording.ts
+npm run typecheck
+```
+
+Expected: no errors.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/main/window/recording.ts src/main/ipc/recording.ts
 git commit -m "feat: add recording BrowserWindow with alwaysOnTop and workspace visibility"
 ```
 
@@ -1315,7 +1323,7 @@ function formatTime(seconds: number): string {
 
 export function RecordingPanel(): React.JSX.Element {
   const { isRecording, micLevel, speakerLevel, speakerAvailable, elapsed, stop } = useRecording()
-  const [stopping, setStopping] = React.useState(false)
+  const [stopping, setStopping] = useState(false)
 
   async function handleStop(): Promise<void> {
     setStopping(true)
@@ -1373,7 +1381,14 @@ export function RecordingPanel(): React.JSX.Element {
 }
 ```
 
-Note: add `import React, { useState } from 'react'` at the top of RecordingPanel.tsx.
+Add these imports at the top of RecordingPanel.tsx:
+
+```tsx
+import React, { useState } from 'react'
+import { Button } from '@mantine/core'
+import { VuMeter } from './VuMeter'
+import { useRecording } from './useRecording'
+```
 
 - [ ] **Step 7: Create App.tsx**
 
