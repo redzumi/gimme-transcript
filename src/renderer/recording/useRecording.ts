@@ -4,7 +4,9 @@ interface RecordingState {
   sessionId: string | null
   isRecording: boolean
   micLevel: number
+  micBands: number[]
   speakerLevel: number
+  speakerBands: number[]
   speakerAvailable: boolean
   elapsed: number
 }
@@ -18,7 +20,9 @@ export function useRecording(): UseRecordingReturn {
     sessionId: null,
     isRecording: false,
     micLevel: 0,
+    micBands: Array.from({ length: 18 }, () => 0),
     speakerLevel: 0,
+    speakerBands: Array.from({ length: 18 }, () => 0),
     speakerAvailable: false,
     elapsed: 0
   })
@@ -32,6 +36,28 @@ export function useRecording(): UseRecordingReturn {
   const startTimeRef = useRef<number>(0)
   const sessionIdRef = useRef<string | null>(null)
   const speakerAvailableRef = useRef(false)
+
+  function extractBands(analyser: AnalyserNode | null): { level: number; bands: number[] } {
+    if (!analyser) {
+      return { level: 0, bands: Array.from({ length: 18 }, () => 0) }
+    }
+
+    const frequencyData = new Uint8Array(analyser.frequencyBinCount)
+    analyser.getByteFrequencyData(frequencyData)
+
+    const level = frequencyData.reduce((sum, value) => sum + value, 0) / frequencyData.length / 255
+    const bandCount = 18
+    const bucketSize = Math.max(1, Math.floor(frequencyData.length / bandCount))
+    const bands = Array.from({ length: bandCount }, (_, index) => {
+      const start = index * bucketSize
+      const end = Math.min(frequencyData.length, start + bucketSize)
+      const slice = frequencyData.slice(start, end)
+      if (slice.length === 0) return 0
+      return slice.reduce((sum, value) => sum + value, 0) / slice.length / 255
+    })
+
+    return { level, bands }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -118,27 +144,20 @@ export function useRecording(): UseRecordingReturn {
         }))
       }
 
-      const dataArr = new Uint8Array(128)
-
       function animate(): void {
         rafRef.current = requestAnimationFrame(animate)
 
+        const micData = extractBands(micAnalyserRef.current)
+        const speakerData = extractBands(speakerAnalyserRef.current)
+
         setState((prev) => ({
           ...prev,
-          elapsed: Math.floor((Date.now() - startTimeRef.current) / 1000)
+          elapsed: Math.floor((Date.now() - startTimeRef.current) / 1000),
+          micLevel: micData.level,
+          micBands: micData.bands,
+          speakerLevel: speakerData.level,
+          speakerBands: speakerData.bands
         }))
-
-        if (micAnalyserRef.current) {
-          micAnalyserRef.current.getByteFrequencyData(dataArr)
-          const avg = dataArr.reduce((s, v) => s + v, 0) / dataArr.length / 255
-          setState((prev) => ({ ...prev, micLevel: avg }))
-        }
-
-        if (speakerAnalyserRef.current) {
-          speakerAnalyserRef.current.getByteFrequencyData(dataArr)
-          const avg = dataArr.reduce((s, v) => s + v, 0) / dataArr.length / 255
-          setState((prev) => ({ ...prev, speakerLevel: avg }))
-        }
       }
       animate()
     }

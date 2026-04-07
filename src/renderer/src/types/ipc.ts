@@ -52,6 +52,13 @@ export interface ModelInfo {
   downloaded: boolean
 }
 
+export interface RecordingPermissions {
+  mic: boolean
+  screenRecording: boolean
+}
+
+export type RecordingPermission = 'microphone' | 'screenRecording'
+
 // ---------------------------------------------------------------------------
 // Invoke channels (renderer → main, returns a value)
 // ---------------------------------------------------------------------------
@@ -102,6 +109,9 @@ export interface IpcInvokeMap {
 
   // Recording window
   'recording:open': { args: []; return: void }
+  'recording:check-permissions': { args: []; return: RecordingPermissions }
+  'recording:open-settings': { args: [permission: RecordingPermission]; return: void }
+  'recording:get-platform': { args: []; return: string }
 }
 
 export type IpcInvokeChannel = keyof IpcInvokeMap

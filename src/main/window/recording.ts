@@ -12,8 +12,8 @@ export function openRecordingWindow(): void {
   }
 
   recordingWindow = new BrowserWindow({
-    width: 360,
-    height: 200,
+    width: 420,
+    height: 390,
     frame: false,
     transparent: true,
     alwaysOnTop: true,

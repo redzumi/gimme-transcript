@@ -1,6 +1,8 @@
+import type { RecordingPermission, RecordingPermissions } from '../renderer/src/types/ipc'
+
 export interface RecordingApi {
-  checkPermissions(): Promise<{ mic: boolean; screenRecording: boolean }>
-  openSettings(permission: string): Promise<void>
+  checkPermissions(): Promise<RecordingPermissions>
+  openSettings(permission: RecordingPermission): Promise<void>
   getDesktopSources(): Promise<Array<{ id: string; name: string }>>
   getPlatform(): Promise<string>
   start(): Promise<{ sessionId: string }>

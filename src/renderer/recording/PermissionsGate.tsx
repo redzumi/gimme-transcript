@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Button } from '@mantine/core'
+import type { RecordingPermission } from '../src/types/ipc'
 
 interface Permissions {
   mic: boolean
@@ -15,7 +16,7 @@ interface Props {
 export function PermissionsGate({ permissions, platform, onRecheck }: Props): React.JSX.Element {
   const [checking, setChecking] = useState(false)
 
-  async function openSettings(permission: string): Promise<void> {
+  async function openSettings(permission: RecordingPermission): Promise<void> {
     await window.recordingApi.openSettings(permission)
   }
 
@@ -26,16 +27,26 @@ export function PermissionsGate({ permissions, platform, onRecheck }: Props): Re
     setChecking(false)
   }
 
+  const requiresScreenRecording = platform === 'darwin'
+  const canContinue = permissions.mic && (!requiresScreenRecording || permissions.screenRecording)
+
   return (
     <div
-      className="w-[360px] rounded-2xl border border-[rgba(15,23,42,0.08)] bg-white/88 shadow-[0_14px_30px_rgba(15,23,42,0.08)] backdrop-blur-[18px] p-4"
+      className="w-[420px] rounded-[30px] border border-[rgba(255,255,255,0.6)] bg-[linear-gradient(180deg,rgba(255,248,244,0.96),rgba(255,255,255,0.88))] p-5 shadow-[0_28px_80px_rgba(77,42,66,0.18)] backdrop-blur-[24px]"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
       <div style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-        <p className="text-xs font-semibold text-[#24191f] mb-3">Permissions needed to record</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#b57a70]">
+          Access check
+        </p>
+        <p className="mt-2 text-lg font-semibold text-[#24191f]">Permissions needed to record</p>
+        <p className="mt-2 text-sm leading-6 text-[#7f6671]">
+          Enable both inputs before starting so the recording window can capture voice and system
+          audio correctly.
+        </p>
 
-        <div className="flex flex-col gap-2 mb-3">
-          <div className="flex items-center justify-between">
+        <div className="mb-4 mt-5 flex flex-col gap-3">
+          <div className="flex items-center justify-between rounded-[24px] border border-[#ecd8cf] bg-[#fffaf7] px-4 py-4">
             <div className="flex items-center gap-2">
               <span>🎤</span>
               <span className="text-xs text-[#5b4653]">Microphone</span>
@@ -58,7 +69,7 @@ export function PermissionsGate({ permissions, platform, onRecheck }: Props): Re
           </div>
 
           {platform === 'darwin' && (
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between rounded-[24px] border border-[#ecd8cf] bg-[#fffaf7] px-4 py-4">
               <div className="flex items-center gap-2">
                 <span>🖥</span>
                 <span className="text-xs text-[#5b4653]">Screen Recording</span>
@@ -84,19 +95,21 @@ export function PermissionsGate({ permissions, platform, onRecheck }: Props): Re
 
         <div className="flex gap-2">
           <Button
-            size="xs"
+            size="sm"
             flex={1}
             color="sunset"
-            disabled={!permissions.mic || checking}
+            radius="xl"
+            disabled={checking}
             loading={checking}
             onClick={recheck}
           >
-            {permissions.mic ? (checking ? 'Checking…' : 'Start Recording') : 'Recheck'}
+            {canContinue ? (checking ? 'Checking…' : 'Start Recording') : 'Recheck'}
           </Button>
           <Button
-            size="xs"
+            size="sm"
             variant="subtle"
             color="gray"
+            radius="xl"
             onClick={() => window.recordingApi.closeWindow()}
           >
             Cancel

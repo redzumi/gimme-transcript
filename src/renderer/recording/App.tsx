@@ -1,17 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { PermissionsGate } from './PermissionsGate'
 import { RecordingPanel } from './RecordingPanel'
+import type { RecordingPermissions } from '../src/types/ipc'
 
 type AppState = 'checking' | 'permissions' | 'recording'
 
-interface Permissions {
-  mic: boolean
-  screenRecording: boolean
-}
-
 export default function App(): React.JSX.Element {
   const [appState, setAppState] = useState<AppState>('checking')
-  const [permissions, setPermissions] = useState<Permissions>({
+  const [permissions, setPermissions] = useState<RecordingPermissions>({
     mic: false,
     screenRecording: false
   })
@@ -24,8 +20,6 @@ export default function App(): React.JSX.Element {
     ])
     setPlatform(plat)
     setPermissions(perms)
-    // Show permissions gate if mic is missing (required), or if on macOS and screen recording
-    // is missing (optional but worth prompting — user can skip).
     const needsPrompt = !perms.mic || (plat === 'darwin' && !perms.screenRecording)
     if (needsPrompt) {
       setAppState('permissions')

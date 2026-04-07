@@ -1,10 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { RecordingPermission, RecordingPermissions } from '../renderer/src/types/ipc'
 
 const recordingApi = {
-  checkPermissions: (): Promise<{ mic: boolean; screenRecording: boolean }> =>
+  checkPermissions: (): Promise<RecordingPermissions> =>
     ipcRenderer.invoke('recording:check-permissions'),
 
-  openSettings: (permission: string): Promise<void> =>
+  openSettings: (permission: RecordingPermission): Promise<void> =>
     ipcRenderer.invoke('recording:open-settings', permission),
 
   getDesktopSources: (): Promise<Array<{ id: string; name: string }>> =>
