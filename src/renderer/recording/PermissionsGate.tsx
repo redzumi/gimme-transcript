@@ -91,7 +91,7 @@ export function PermissionsGate({ permissions, platform, onRecheck }: Props): Re
             loading={checking}
             onClick={recheck}
           >
-            {permissions.mic ? 'Start Recording' : 'Recheck'}
+            {permissions.mic ? (checking ? 'Checking…' : 'Start Recording') : 'Recheck'}
           </Button>
           <Button
             size="xs"

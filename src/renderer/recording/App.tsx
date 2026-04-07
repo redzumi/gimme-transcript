@@ -24,11 +24,13 @@ export default function App(): React.JSX.Element {
     ])
     setPlatform(plat)
     setPermissions(perms)
-    // Need at least mic. Screen recording is optional (system audio degrades gracefully).
-    if (perms.mic) {
-      setAppState('recording')
-    } else {
+    // Show permissions gate if mic is missing (required), or if on macOS and screen recording
+    // is missing (optional but worth prompting — user can skip).
+    const needsPrompt = !perms.mic || (plat === 'darwin' && !perms.screenRecording)
+    if (needsPrompt) {
       setAppState('permissions')
+    } else {
+      setAppState('recording')
     }
   }
 
