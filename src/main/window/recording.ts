@@ -1,4 +1,4 @@
-import { BrowserWindow, app } from 'electron'
+import { BrowserWindow, app, desktopCapturer } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import log from 'electron-log'
@@ -13,7 +13,7 @@ export function openRecordingWindow(): void {
 
   recordingWindow = new BrowserWindow({
     width: 420,
-    height: 390,
+    height: 490,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -35,6 +35,15 @@ export function openRecordingWindow(): void {
   if (process.platform === 'darwin') {
     void app.dock?.show()
   }
+
+  recordingWindow.webContents.session.setDisplayMediaRequestHandler(async (_request, callback) => {
+    try {
+      const sources = await desktopCapturer.getSources({ types: ['screen'] })
+      callback({ video: sources[0] ?? null, audio: 'loopback' })
+    } catch {
+      callback({})
+    }
+  })
 
   recordingWindow.once('ready-to-show', () => {
     recordingWindow?.showInactive()

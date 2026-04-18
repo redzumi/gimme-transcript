@@ -36,6 +36,14 @@ export function registerRecordingHandlers(): void {
   // Check OS-level permissions
   ipcMain.handle('recording:check-permissions', async () => {
     if (process.platform === 'darwin') {
+      // Trigger OS dialogs on first run (not-determined state)
+      if (systemPreferences.getMediaAccessStatus('microphone') === 'not-determined') {
+        await systemPreferences.askForMediaAccess('microphone')
+      }
+      if (systemPreferences.getMediaAccessStatus('screen') === 'not-determined') {
+        await desktopCapturer.getSources({ types: ['screen'] }).catch(() => {})
+      }
+
       const mic = systemPreferences.getMediaAccessStatus('microphone')
       const screen = systemPreferences.getMediaAccessStatus('screen')
       return {
@@ -43,7 +51,6 @@ export function registerRecordingHandlers(): void {
         screenRecording: screen === 'granted'
       }
     }
-    // Windows / Linux: mic only — system audio needs no extra OS permission
     return { mic: true, screenRecording: true }
   })
 
