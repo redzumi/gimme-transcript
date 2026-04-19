@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow } from 'electron'
+import { app, shell, BrowserWindow, session } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../build/icon.png?asset'
@@ -6,6 +6,10 @@ import { registerHandlers } from './ipc'
 import { getSettings, applyStoragePath } from './storage'
 
 app.setName('Gimme Transcript')
+
+if (process.platform === 'darwin') {
+  app.commandLine.appendSwitch('disable-features', 'MacCatapLoopbackAudioForScreenShare')
+}
 
 if (process.env.GIMME_TRANSCRIPT_USER_DATA_DIR) {
   app.setPath('userData', process.env.GIMME_TRANSCRIPT_USER_DATA_DIR)
@@ -53,6 +57,15 @@ app.whenReady().then(() => {
   // Apply saved storage path before any storage calls
   const settings = getSettings()
   applyStoragePath(settings)
+
+  // Allow media permissions (mic + screen) for all windows
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
+    if (permission === 'media') {
+      callback(true)
+    } else {
+      callback(false)
+    }
+  })
 
   registerHandlers()
 

@@ -39,7 +39,7 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 function getSessionName(s: Session): string {
-  return s.name ?? s.audioFile.split('/').pop() ?? s.audioFile
+  return s.name ?? s.audioSources[0]?.path.split('/').pop() ?? 'Session'
 }
 
 export default function Home({ onOpenSession, onOpenSettings }: Props): React.JSX.Element {
@@ -89,9 +89,15 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
       setSessions((prev) => prev.map((s) => (s.id === sessionId ? { ...s, status: 'done' } : s)))
     })
 
+    const offRecorded = window.api.on('recording:session-created', ({ session }) => {
+      setSessions((prev) => [session, ...prev])
+      onOpenSession(session.id)
+    })
+
     return () => {
       offProgress()
       offDone()
+      offRecorded()
     }
   }, [reload])
 
@@ -148,6 +154,11 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
       status: 'done'
     })
     setSessions((prev) => [updated, ...prev])
+  }
+
+  async function handleRecord(): Promise<void> {
+    setNewMenuOpen(false)
+    await window.api.invoke('recording:open')
   }
 
   async function handleDeleteSession(e: React.MouseEvent, id: string): Promise<void> {
@@ -270,7 +281,7 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
         </Group>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden px-4 pb-4 pt-4">
         <div className="flex min-w-0 flex-1 flex-col border-r border-[#ead7cf] bg-white/72 backdrop-blur-sm">
           <div className="flex items-center justify-between border-b border-[#f3e5dd] px-5 py-2.5">
             <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.06em' }}>
@@ -305,6 +316,13 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
                     onClick={handleEmptySession}
                   >
                     Empty session
+                  </button>
+                  <div className="my-1 border-t border-[#f3e5dd]" />
+                  <button
+                    className="w-full px-3 py-2 text-left text-sm text-[#5b4653] transition-colors hover:bg-[#fff4ee]"
+                    onClick={handleRecord}
+                  >
+                    Record conversation
                   </button>
                 </div>
               )}

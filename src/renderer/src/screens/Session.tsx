@@ -14,6 +14,10 @@ function formatTime(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
+function getFileName(filePath: string): string {
+  return filePath.split(/[\\/]/).pop() ?? filePath
+}
+
 const SPEAKER_COLORS = [
   { pill: 'bg-blue-100 text-blue-700', bar: 'bg-blue-50 border-l-2 border-blue-300' },
   { pill: 'bg-emerald-100 text-emerald-700', bar: 'bg-emerald-50 border-l-2 border-emerald-300' },
@@ -42,6 +46,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [converting, setConverting] = useState(false)
   const [convertProgress, setConvertProgress] = useState(0)
+  const [filesOpen, setFilesOpen] = useState(false)
   const [pendingSeg, setPendingSeg] = useState<Segment | null>(null)
   const editRef = useRef<HTMLTextAreaElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
@@ -224,9 +229,9 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
     setEditingId(null)
   }
 
-  const hasAudio = !!session?.audioFile && session.audioFile !== ''
+  const hasAudio = (session?.audioSources?.[0]?.path ?? '') !== ''
   const audioSrc = hasAudio
-    ? 'file://' + encodeURI(session?.convertedAudioPath ?? session?.audioFile ?? '')
+    ? 'file://' + encodeURI(session?.convertedAudioPath ?? session?.audioSources?.[0]?.path ?? '')
     : undefined
 
   function playSegment(seg: Segment): void {
@@ -251,7 +256,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
       playSegment(seg)
       return
     }
-    const ext = session.audioFile.split('.').pop()?.toLowerCase() ?? ''
+    const ext = (session.audioSources[0]?.path ?? '').split('.').pop()?.toLowerCase() ?? ''
     if (SUPPORTED_EXTS.has(ext)) {
       playSegment(seg)
       return
@@ -295,13 +300,40 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
   async function handleTranscribe(): Promise<void> {
     setError(null)
     setSession((prev) => (prev ? { ...prev, status: 'transcribing' } : prev))
+    if (session?.recordingSource === 'recorded') {
+      await window.api.invoke('whisper:transcribe-all', sessionId)
+      return
+    }
     await window.api.invoke('whisper:transcribe', sessionId)
   }
 
-  if (!session) return <div className="h-screen bg-[var(--app-shell)]" />
+  async function handleTranscribeAll(): Promise<void> {
+    setError(null)
+    setSession((prev) => (prev ? { ...prev, status: 'transcribing' } : prev))
+    await window.api.invoke('whisper:transcribe-all', sessionId)
+  }
 
-  const sessionName = session.name ?? session.audioFile.split('/').pop() ?? session.audioFile
-  const showTranscript = session.status === 'transcribing' || session.status === 'done'
+  const sessionName = session?.name ?? session?.audioSources[0]?.path.split('/').pop() ?? 'Session'
+  const showTranscript = session?.status === 'transcribing' || session?.status === 'done'
+  const recordedFiles = useMemo(() => {
+    if (!session || session.recordingSource !== 'recorded') return []
+
+    const files = session.audioSources.map((source) => ({
+      label: source.label,
+      path: source.path
+    }))
+
+    if (session.convertedAudioPath) {
+      files.push({
+        label: 'Playback file',
+        path: session.convertedAudioPath
+      })
+    }
+
+    return files
+  }, [session])
+
+  if (!session) return <div className="h-screen bg-[var(--app-shell)]" />
 
   return (
     <div
@@ -395,6 +427,52 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
         </div>
       </Modal>
 
+      {session.recordingSource === 'recorded' && (
+        <Modal
+          opened={filesOpen}
+          onClose={() => setFilesOpen(false)}
+          title="Recorded files"
+          centered
+          size="sm"
+        >
+          <div className="flex flex-col gap-3">
+            <Text size="sm" c="dimmed">
+              These tracks are stored locally in your sessions folder.
+            </Text>
+
+            <div className="flex flex-col gap-2">
+              {recordedFiles.map((file) => (
+                <div
+                  key={file.path}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-[#edd8ce] bg-[#fffaf7] px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-[#24191f]">{file.label}</p>
+                    <p className="truncate text-xs text-[#8f7982]">{getFileName(file.path)}</p>
+                  </div>
+                  <Button
+                    size="xs"
+                    variant="light"
+                    color="sunset"
+                    onClick={async () => {
+                      await window.api.invoke('recording:reveal-path', file.path)
+                    }}
+                  >
+                    Reveal
+                  </Button>
+                </div>
+              ))}
+            </div>
+
+            <Group justify="flex-end" mt="xs">
+              <Button size="sm" variant="light" color="gray" onClick={() => setFilesOpen(false)}>
+                Close
+              </Button>
+            </Group>
+          </div>
+        </Modal>
+      )}
+
       <div className="relative z-[60] flex h-12 shrink-0 items-center gap-2 border-b border-[#ead7cf] bg-white/70 px-4 backdrop-blur-sm">
         <button
           className="rounded px-1.5 py-1 text-xs text-[#8f7982] transition-colors hover:bg-[#fff2eb] hover:text-[#24191f]"
@@ -404,6 +482,19 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
         </button>
         <div className="w-px h-3.5 bg-gray-200" />
         <span className="flex-1 truncate text-sm font-medium text-[#5b4653]">{sessionName}</span>
+        {session.recordingSource === 'recorded' && (
+          <Button
+            size="xs"
+            variant="light"
+            color="sunset"
+            onClick={(e) => {
+              e.stopPropagation()
+              setFilesOpen(true)
+            }}
+          >
+            Files
+          </Button>
+        )}
         {session.status === 'done' && (
           <Group gap="xs">
             <CopyButton session={session} speakers={speakers} />
@@ -494,13 +585,35 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
               />
             </div>
           )}
-          <Button
-            color="sunset"
-            disabled={downloadedModels.length === 0}
-            onClick={handleTranscribe}
-          >
-            Transcribe
-          </Button>
+          {session.audioSources.length > 1 ? (
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-full max-w-xs flex flex-col gap-1.5">
+                {session.audioSources.map((src) => (
+                  <div
+                    key={src.id}
+                    className="flex items-center justify-between rounded-lg border border-[#edd8ce] bg-white/70 px-3 py-2"
+                  >
+                    <span className="text-xs text-[#5b4653] truncate">{src.label}</span>
+                  </div>
+                ))}
+              </div>
+              <Button
+                color="sunset"
+                disabled={downloadedModels.length === 0}
+                onClick={handleTranscribeAll}
+              >
+                Transcribe All Sources
+              </Button>
+            </div>
+          ) : (
+            <Button
+              color="sunset"
+              disabled={downloadedModels.length === 0}
+              onClick={handleTranscribe}
+            >
+              Transcribe
+            </Button>
+          )}
           {error && <p className="text-xs text-red-500 text-center max-w-xs px-4">{error}</p>}
         </div>
       )}
@@ -779,7 +892,7 @@ function ExportButton({ session, speakers }: ExportButtonProps): React.JSX.Eleme
     setOpen(false)
     const base =
       session.name ??
-      session.audioFile
+      (session.audioSources[0]?.path ?? '')
         .split('/')
         .pop()
         ?.replace(/\.[^.]+$/, '') ??
@@ -881,7 +994,11 @@ function MergeExportModal({
             key={s.id}
             checked={checkedIds.has(s.id)}
             onChange={() => toggle(s.id)}
-            label={<Text size="sm">{s.name ?? s.audioFile.split('/').pop() ?? s.audioFile}</Text>}
+            label={
+              <Text size="sm">
+                {s.name ?? s.audioSources[0]?.path.split('/').pop() ?? 'Session'}
+              </Text>
+            }
           />
         ))}
         {sessions.length === 0 && (

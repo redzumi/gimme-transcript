@@ -50,7 +50,9 @@ export function getModelsDir(): string {
 }
 
 export function applyStoragePath(settings: Settings): void {
-  setCustomStoragePath(
-    settings.storagePath !== getAppDataPath() ? settings.storagePath : null
-  )
+  setCustomStoragePath(settings.storagePath !== getAppDataPath() ? settings.storagePath : null)
+}
+
+export function getRecordingFilePath(sessionId: string, source: 'mic' | 'speaker'): string {
+  return join(getSessionsDir(), `${sessionId}_${source}.webm`)
 }

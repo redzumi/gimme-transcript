@@ -1,2 +1,2 @@
-export { transcribeSession, cancelTranscription } from './runner'
+export { transcribeSession, cancelTranscription, transcribeAllSources } from './runner'
 export { getWhisperBinaryPath } from './binary'

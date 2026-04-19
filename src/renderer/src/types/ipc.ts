@@ -2,18 +2,28 @@
 
 export type WhisperModel = 'tiny' | 'base' | 'small' | 'medium' | 'large'
 
+export interface AudioSource {
+  id: string
+  path: string
+  label: string
+  speakerId: string | null
+}
+
 export interface Session {
   schemaVersion: number
   id: string
   name?: string
   createdAt: string
-  audioFile: string
-  convertedAudioPath?: string
-  audioConvertedCBR?: boolean
   model: WhisperModel
   language: string
   status: 'idle' | 'transcribing' | 'done'
   segments: Segment[]
+  audioSources: AudioSource[]
+  convertedAudioPath?: string
+  audioConvertedCBR?: boolean
+  recordingSource?: 'recorded'
+  // v1 legacy — only for migration
+  audioFile?: string
 }
 
 export interface Segment {
@@ -41,6 +51,13 @@ export interface ModelInfo {
   sizeBytes: number
   downloaded: boolean
 }
+
+export interface RecordingPermissions {
+  mic: boolean
+  screenRecording: boolean
+}
+
+export type RecordingPermission = 'microphone' | 'screenRecording'
 
 // ---------------------------------------------------------------------------
 // Invoke channels (renderer → main, returns a value)
@@ -75,6 +92,7 @@ export interface IpcInvokeMap {
 
   // Whisper transcription
   'whisper:transcribe': { args: [sessionId: string]; return: void }
+  'whisper:transcribe-all': { args: [sessionId: string]; return: void }
   'whisper:cancel': { args: [sessionId: string]; return: void }
 
   // Native dialogs
@@ -88,6 +106,13 @@ export interface IpcInvokeMap {
 
   // File export
   'export:write': { args: [filePath: string, content: string]; return: void }
+
+  // Recording window
+  'recording:open': { args: []; return: void }
+  'recording:check-permissions': { args: []; return: RecordingPermissions }
+  'recording:open-settings': { args: [permission: RecordingPermission]; return: void }
+  'recording:get-platform': { args: []; return: string }
+  'recording:reveal-path': { args: [path: string]; return: boolean }
 }
 
 export type IpcInvokeChannel = keyof IpcInvokeMap
@@ -107,6 +132,7 @@ export interface IpcEventMap {
   'audio:convert-progress': { sessionId: string; percent: number }
   'audio:convert-done': { sessionId: string; convertedAudioPath: string }
   'audio:convert-error': { sessionId: string; message: string }
+  'recording:session-created': { session: Session }
 }
 
 export type IpcEventChannel = keyof IpcEventMap

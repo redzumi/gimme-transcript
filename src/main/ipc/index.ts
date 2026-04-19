@@ -5,6 +5,7 @@ import { registerDialogHandlers } from './dialog'
 import { registerModelHandlers } from './models'
 import { registerWhisperHandlers } from './whisper'
 import { registerAudioHandlers } from './audio'
+import { registerRecordingHandlers } from './recording'
 
 export function registerHandlers(): void {
   registerSessionHandlers()
@@ -14,4 +15,5 @@ export function registerHandlers(): void {
   registerModelHandlers()
   registerWhisperHandlers()
   registerAudioHandlers()
+  registerRecordingHandlers()
 }

@@ -3,6 +3,7 @@
 import { spawn } from 'child_process'
 import type { ChildProcess } from 'child_process'
 import { existsSync, unlinkSync, writeFileSync } from 'fs'
+import type { Segment } from '../../renderer/src/types/ipc'
 import { writeFile } from 'fs/promises'
 import { cpus } from 'os'
 import { BrowserWindow } from 'electron'
@@ -22,6 +23,60 @@ function broadcast(channel: string, payload: unknown): void {
   })
 }
 
+async function runWhisper(
+  sessionId: string,
+  audioPath: string,
+  binaryPath: string,
+  mPath: string,
+  lang: string
+): Promise<{ segments: Segment[]; tempFile: boolean; preparedPath: string }> {
+  const { audioPath: preparedPath, tempFile } = await prepareAudio(audioPath)
+  const threadCount = String(Math.max(1, Math.floor(cpus().length / 2)))
+  const args = ['-m', mPath, '-f', preparedPath, '-l', lang, '--print-progress', '-t', threadCount]
+  const segments: Segment[] = []
+
+  await new Promise<void>((resolve, reject) => {
+    const proc = spawn(binaryPath, args)
+    activeProcesses.set(sessionId + ':' + audioPath, proc)
+    let stdoutBuf = ''
+
+    proc.stdout.on('data', (data: Buffer) => {
+      stdoutBuf += data.toString()
+      const lines = stdoutBuf.split('\n')
+      stdoutBuf = lines.pop() ?? ''
+      for (const line of lines) {
+        const seg = parseSegmentLine(line)
+        if (seg) segments.push(seg)
+      }
+    })
+
+    proc.stderr.on('data', (data: Buffer) => {
+      const text = data.toString()
+      for (const line of text.split('\n')) {
+        const pct = parseProgressLine(line)
+        if (pct !== null) broadcast('whisper:progress', { sessionId, percent: pct, eta: null })
+      }
+    })
+
+    proc.on('close', (code) => {
+      activeProcesses.delete(sessionId + ':' + audioPath)
+      if (stdoutBuf.trim()) {
+        const seg = parseSegmentLine(stdoutBuf)
+        if (seg) segments.push(seg)
+      }
+      if (code === 0) resolve()
+      else reject(new Error(`whisper.cpp exited with code ${code}`))
+    })
+
+    proc.on('error', (err) => {
+      activeProcesses.delete(sessionId + ':' + audioPath)
+      reject(err)
+    })
+  })
+
+  return { segments, tempFile, preparedPath }
+}
+
 export async function transcribeSession(sessionId: string): Promise<void> {
   const session = getSession(sessionId)
   if (!session) throw new Error(`Session not found: ${sessionId}`)
@@ -38,7 +93,8 @@ export async function transcribeSession(sessionId: string): Promise<void> {
   const mPath = modelPath(actualModel)
 
   // Convert audio if needed (async, non-blocking)
-  const { audioPath, tempFile } = await prepareAudio(session.audioFile)
+  const primaryPath = session.audioSources[0]?.path ?? ''
+  const { audioPath, tempFile } = await prepareAudio(primaryPath)
 
   updateSession(sessionId, { status: 'transcribing', segments: [], model: actualModel })
 
@@ -161,4 +217,49 @@ export function cancelTranscription(sessionId: string): void {
     cancelledSessions.add(sessionId)
     proc.kill('SIGTERM')
   }
+}
+
+export async function transcribeAllSources(sessionId: string): Promise<void> {
+  const session = getSession(sessionId)
+  if (!session) throw new Error(`Session not found: ${sessionId}`)
+
+  const binaryPath = getWhisperBinaryPath()
+  if (!existsSync(binaryPath)) {
+    throw new Error(`whisper.cpp binary not found at ${binaryPath}.\nRun: npm run whisper:setup`)
+  }
+
+  const actualModel = resolveDownloadedModel(session.model)
+  if (!actualModel) throw new Error(`Model "${session.model}" is not downloaded`)
+  const mPath = modelPath(actualModel)
+  const lang = session.language === 'auto' ? 'auto' : session.language
+
+  updateSession(sessionId, { status: 'transcribing', segments: [], model: actualModel })
+
+  const allSegments: Segment[] = []
+
+  for (const source of session.audioSources) {
+    if (!source.path || !existsSync(source.path)) continue
+    const { segments, tempFile, preparedPath } = await runWhisper(
+      sessionId,
+      source.path,
+      binaryPath,
+      mPath,
+      lang
+    )
+    if (tempFile) {
+      try {
+        unlinkSync(preparedPath)
+      } catch {
+        /* ignore */
+      }
+    }
+    allSegments.push(...segments.map((seg) => ({ ...seg, speakerId: source.speakerId ?? null })))
+  }
+
+  allSegments.sort((a, b) => a.start - b.start)
+
+  const sessionFilePath = getSessionPath(sessionId)
+  const updated = { ...session, status: 'done' as const, segments: allSegments, model: actualModel }
+  writeFileSync(sessionFilePath, JSON.stringify(updated, null, 2), 'utf8')
+  broadcast('whisper:done', { sessionId })
 }

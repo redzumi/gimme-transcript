@@ -1,5 +1,4 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { electronAPI } from '@electron-toolkit/preload'
 import type {
   IpcInvokeChannel,
   IpcEventChannel,
@@ -21,17 +20,11 @@ const api = {
       listener(payload)
     ipcRenderer.on(channel, handler)
     return () => ipcRenderer.removeListener(channel, handler)
-  },
-
-  off<C extends IpcEventChannel>(channel: C, listener: (payload: EventPayload<C>) => void): void {
-    ipcRenderer.removeAllListeners(channel)
-    void listener
   }
 }
 
 try {
-  contextBridge.exposeInMainWorld('electron', electronAPI)
+  contextBridge.exposeInMainWorld('api', api)
 } catch (error) {
   console.error(error)
 }
-contextBridge.exposeInMainWorld('api', api)
