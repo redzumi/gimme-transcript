@@ -300,6 +300,10 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
   async function handleTranscribe(): Promise<void> {
     setError(null)
     setSession((prev) => (prev ? { ...prev, status: 'transcribing' } : prev))
+    if (session?.recordingSource === 'recorded') {
+      await window.api.invoke('whisper:transcribe-all', sessionId)
+      return
+    }
     await window.api.invoke('whisper:transcribe', sessionId)
   }
 

@@ -1,24 +1,14 @@
 // Prepare audio for whisper-cli.
 //
-// NOTE:
-// Even though whisper.cpp may claim to support some formats natively,
-// real-world files (and certain builds/decoder paths) can fail to decode.
-// To keep transcription robust, we convert to 16kHz mono WAV for anything
-// except clearly safe formats.
-//
-// In practice: convert most containers/codecs via ffmpeg; keep wav/mp3/flac as-is.
+// Whisper input is normalized to 16kHz mono WAV and padded with a short tail
+// of silence. That keeps transcription stable on abrupt recording stop and
+// avoids clipping the last words when the source ends very close to speech.
 
 import { execSync, spawn } from 'child_process'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { randomUUID } from 'crypto'
-
-const NATIVE_FORMATS = new Set(['wav', 'mp3', 'flac'])
-
-function ext(filePath: string): string {
-  return filePath.toLowerCase().split('.').pop() ?? ''
-}
 
 const FFMPEG_FALLBACK_PATHS: Record<NodeJS.Platform, string[]> = {
   darwin: ['/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg'],
@@ -106,18 +96,12 @@ export function convertForPlayback(
 }
 
 export function prepareAudio(inputPath: string): Promise<ConvertResult> {
-  if (NATIVE_FORMATS.has(ext(inputPath))) {
-    return Promise.resolve({ audioPath: inputPath, tempFile: false })
-  }
-
   const ffmpeg = findFfmpeg()
   if (!ffmpeg) {
     return Promise.reject(
       new Error(
         `ffmpeg not found. ${ffmpegInstallHint()}\n` +
-          'Required to convert ' +
-          ext(inputPath).toUpperCase() +
-          ' files.'
+          'Required to prepare audio for transcription.'
       )
     )
   }
@@ -129,6 +113,8 @@ export function prepareAudio(inputPath: string): Promise<ConvertResult> {
       '-y',
       '-i',
       inputPath,
+      '-af',
+      'apad=pad_dur=1',
       '-ar',
       '16000',
       '-ac',
