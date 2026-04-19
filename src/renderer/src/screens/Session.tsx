@@ -14,6 +14,10 @@ function formatTime(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
+function getFileName(filePath: string): string {
+  return filePath.split(/[\\/]/).pop() ?? filePath
+}
+
 const SPEAKER_COLORS = [
   { pill: 'bg-blue-100 text-blue-700', bar: 'bg-blue-50 border-l-2 border-blue-300' },
   { pill: 'bg-emerald-100 text-emerald-700', bar: 'bg-emerald-50 border-l-2 border-emerald-300' },
@@ -42,6 +46,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [converting, setConverting] = useState(false)
   const [convertProgress, setConvertProgress] = useState(0)
+  const [filesOpen, setFilesOpen] = useState(false)
   const [pendingSeg, setPendingSeg] = useState<Segment | null>(null)
   const editRef = useRef<HTMLTextAreaElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
@@ -304,10 +309,27 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
     await window.api.invoke('whisper:transcribe-all', sessionId)
   }
 
-  if (!session) return <div className="h-screen bg-[var(--app-shell)]" />
+  const sessionName = session?.name ?? session?.audioSources[0]?.path.split('/').pop() ?? 'Session'
+  const showTranscript = session?.status === 'transcribing' || session?.status === 'done'
+  const recordedFiles = useMemo(() => {
+    if (!session || session.recordingSource !== 'recorded') return []
 
-  const sessionName = session.name ?? session.audioSources[0]?.path.split('/').pop() ?? 'Session'
-  const showTranscript = session.status === 'transcribing' || session.status === 'done'
+    const files = session.audioSources.map((source) => ({
+      label: source.label,
+      path: source.path
+    }))
+
+    if (session.convertedAudioPath) {
+      files.push({
+        label: 'Playback file',
+        path: session.convertedAudioPath
+      })
+    }
+
+    return files
+  }, [session])
+
+  if (!session) return <div className="h-screen bg-[var(--app-shell)]" />
 
   return (
     <div
@@ -401,6 +423,52 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
         </div>
       </Modal>
 
+      {session.recordingSource === 'recorded' && (
+        <Modal
+          opened={filesOpen}
+          onClose={() => setFilesOpen(false)}
+          title="Recorded files"
+          centered
+          size="sm"
+        >
+          <div className="flex flex-col gap-3">
+            <Text size="sm" c="dimmed">
+              These tracks are stored locally in your sessions folder.
+            </Text>
+
+            <div className="flex flex-col gap-2">
+              {recordedFiles.map((file) => (
+                <div
+                  key={file.path}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-[#edd8ce] bg-[#fffaf7] px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-[#24191f]">{file.label}</p>
+                    <p className="truncate text-xs text-[#8f7982]">{getFileName(file.path)}</p>
+                  </div>
+                  <Button
+                    size="xs"
+                    variant="light"
+                    color="sunset"
+                    onClick={async () => {
+                      await window.api.invoke('recording:reveal-path', file.path)
+                    }}
+                  >
+                    Reveal
+                  </Button>
+                </div>
+              ))}
+            </div>
+
+            <Group justify="flex-end" mt="xs">
+              <Button size="sm" variant="light" color="gray" onClick={() => setFilesOpen(false)}>
+                Close
+              </Button>
+            </Group>
+          </div>
+        </Modal>
+      )}
+
       <div className="relative z-[60] flex h-12 shrink-0 items-center gap-2 border-b border-[#ead7cf] bg-white/70 px-4 backdrop-blur-sm">
         <button
           className="rounded px-1.5 py-1 text-xs text-[#8f7982] transition-colors hover:bg-[#fff2eb] hover:text-[#24191f]"
@@ -410,6 +478,19 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
         </button>
         <div className="w-px h-3.5 bg-gray-200" />
         <span className="flex-1 truncate text-sm font-medium text-[#5b4653]">{sessionName}</span>
+        {session.recordingSource === 'recorded' && (
+          <Button
+            size="xs"
+            variant="light"
+            color="sunset"
+            onClick={(e) => {
+              e.stopPropagation()
+              setFilesOpen(true)
+            }}
+          >
+            Files
+          </Button>
+        )}
         {session.status === 'done' && (
           <Group gap="xs">
             <CopyButton session={session} speakers={speakers} />

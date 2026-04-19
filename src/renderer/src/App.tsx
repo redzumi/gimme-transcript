@@ -24,28 +24,29 @@ export default function App(): React.JSX.Element {
 
   async function checkStartupState(): Promise<void> {
     setCheckingPermissions(true)
+    try {
+      const [perms, currentPlatform, models] = await Promise.all([
+        window.api.invoke('recording:check-permissions'),
+        window.api.invoke('recording:get-platform'),
+        window.api.invoke('models:list')
+      ])
 
-    const [perms, currentPlatform, models] = await Promise.all([
-      window.api.invoke('recording:check-permissions'),
-      window.api.invoke('recording:get-platform'),
-      window.api.invoke('models:list')
-    ])
+      setPermissions(perms)
+      setPlatform(currentPlatform)
 
-    setPermissions(perms)
-    setPlatform(currentPlatform)
+      const requiresScreenRecording = currentPlatform === 'darwin'
+      const hasAllPermissions = perms.mic && (!requiresScreenRecording || perms.screenRecording)
 
-    const requiresScreenRecording = currentPlatform === 'darwin'
-    const hasAllPermissions = perms.mic && (!requiresScreenRecording || perms.screenRecording)
+      if (!hasAllPermissions) {
+        setScreen({ name: 'permissions' })
+        return
+      }
 
-    if (!hasAllPermissions) {
-      setScreen({ name: 'permissions' })
+      const hasModel = models.some((m) => m.downloaded)
+      setScreen(hasModel ? { name: 'home' } : { name: 'firstLaunch' })
+    } finally {
       setCheckingPermissions(false)
-      return
     }
-
-    const hasModel = models.some((m) => m.downloaded)
-    setScreen(hasModel ? { name: 'home' } : { name: 'firstLaunch' })
-    setCheckingPermissions(false)
   }
 
   async function openPermissionSettings(permission: RecordingPermission): Promise<void> {

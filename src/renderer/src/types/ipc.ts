@@ -112,6 +112,7 @@ export interface IpcInvokeMap {
   'recording:check-permissions': { args: []; return: RecordingPermissions }
   'recording:open-settings': { args: [permission: RecordingPermission]; return: void }
   'recording:get-platform': { args: []; return: string }
+  'recording:reveal-path': { args: [path: string]; return: boolean }
 }
 
 export type IpcInvokeChannel = keyof IpcInvokeMap

@@ -68,14 +68,17 @@ export function registerRecordingHandlers(): void {
     }
   })
 
-  // Get desktop sources for system audio capture
-  ipcMain.handle('recording:get-desktop-sources', async () => {
-    const sources = await desktopCapturer.getSources({ types: ['screen'] })
-    return sources.map((s) => ({ id: s.id, name: s.name }))
-  })
-
   // Get current platform
   ipcMain.handle('recording:get-platform', () => process.platform)
+
+  ipcMain.handle('recording:reveal-path', (_e, filePath: string) => {
+    try {
+      return shell.showItemInFolder(filePath)
+    } catch (err) {
+      log.error('[RECORDING] reveal path error', { filePath, err })
+      return false
+    }
+  })
 
   // Start recording: create empty files on disk, return a session ID
   ipcMain.handle('recording:start', () => {

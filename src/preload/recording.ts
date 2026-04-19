@@ -8,9 +8,6 @@ const recordingApi = {
   openSettings: (permission: RecordingPermission): Promise<void> =>
     ipcRenderer.invoke('recording:open-settings', permission),
 
-  getDesktopSources: (): Promise<Array<{ id: string; name: string }>> =>
-    ipcRenderer.invoke('recording:get-desktop-sources'),
-
   getPlatform: (): Promise<string> => ipcRenderer.invoke('recording:get-platform'),
 
   start: (): Promise<{ sessionId: string }> => ipcRenderer.invoke('recording:start'),

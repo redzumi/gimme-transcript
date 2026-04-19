@@ -7,6 +7,10 @@ import { getSettings, applyStoragePath } from './storage'
 
 app.setName('Gimme Transcript')
 
+if (process.platform === 'darwin') {
+  app.commandLine.appendSwitch('disable-features', 'MacCatapLoopbackAudioForScreenShare')
+}
+
 if (process.env.GIMME_TRANSCRIPT_USER_DATA_DIR) {
   app.setPath('userData', process.env.GIMME_TRANSCRIPT_USER_DATA_DIR)
 }

@@ -12,10 +12,11 @@ export function openRecordingWindow(): void {
   }
 
   recordingWindow = new BrowserWindow({
-    width: 420,
-    height: 490,
+    width: 328,
+    height: 88,
     frame: false,
-    transparent: true,
+    transparent: false,
+    backgroundColor: '#fffaf5',
     alwaysOnTop: true,
     skipTaskbar: true,
     movable: true,

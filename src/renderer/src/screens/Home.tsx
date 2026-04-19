@@ -281,7 +281,7 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
         </Group>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden px-4 pb-4 pt-4">
         <div className="flex min-w-0 flex-1 flex-col border-r border-[#ead7cf] bg-white/72 backdrop-blur-sm">
           <div className="flex items-center justify-between border-b border-[#f3e5dd] px-5 py-2.5">
             <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.06em' }}>

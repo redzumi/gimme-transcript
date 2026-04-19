@@ -3,7 +3,6 @@ import type { RecordingPermission, RecordingPermissions } from '../renderer/src/
 export interface RecordingApi {
   checkPermissions(): Promise<RecordingPermissions>
   openSettings(permission: RecordingPermission): Promise<void>
-  getDesktopSources(): Promise<Array<{ id: string; name: string }>>
   getPlatform(): Promise<string>
   start(): Promise<{ sessionId: string }>
   sendChunk(sessionId: string, source: 'mic' | 'speaker', data: ArrayBuffer): Promise<void>

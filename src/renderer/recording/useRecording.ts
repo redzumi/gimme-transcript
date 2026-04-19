@@ -1,205 +1,488 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { TrackKind, TrackStatus } from './recordingUtils'
+import { createBars, getPreferredMimeType, limitLogs, nowLabel, readBands } from './recordingUtils'
+
+export interface AudioInputOption {
+  value: string
+  label: string
+}
+
+interface TrackState {
+  status: TrackStatus
+  available: boolean
+  level: number
+  bars: number[]
+  logs: string[]
+}
 
 interface RecordingState {
   sessionId: string | null
-  isRecording: boolean
-  micLevel: number
-  micBands: number[]
-  speakerLevel: number
-  speakerBands: number[]
-  speakerAvailable: boolean
+  isStarting: boolean
+  isStopping: boolean
   elapsed: number
+  audioInputs: AudioInputOption[]
+  selectedInput: string
+  microphone: TrackState
+  system: TrackState
+}
+
+interface TrackRuntime {
+  stream: MediaStream
+  recorder: MediaRecorder
+  audioContext: AudioContext
+  analyser: AnalyserNode
+}
+
+interface RuntimeState {
+  sessionId: string | null
+  isMounted: boolean
+  isStarting: boolean
+  isStopping: boolean
+  startedAt: number | null
+  rafId: number | null
+  microphone: TrackRuntime | null
+  system: TrackRuntime | null
 }
 
 interface UseRecordingReturn extends RecordingState {
+  start: () => Promise<void>
   stop: () => Promise<void>
+  cancel: () => Promise<void>
+  setSelectedInput: (value: string) => void
+}
+
+const createTrackState = (logs: string[]): TrackState => ({
+  status: 'idle',
+  available: false,
+  level: 0,
+  bars: createBars(),
+  logs
+})
+
+const initialState: RecordingState = {
+  sessionId: null,
+  isStarting: false,
+  isStopping: false,
+  elapsed: 0,
+  audioInputs: [],
+  selectedInput: 'default',
+  microphone: createTrackState(['Waiting for microphone input...']),
+  system: createTrackState(['Waiting for system audio...'])
+}
+
+function createTrackLogMessage(message: string): string {
+  return `[${nowLabel()}] ${message}`
+}
+
+function createMicConstraints(selectedInput: string): MediaStreamConstraints {
+  if (selectedInput === 'default') {
+    return { audio: true, video: false }
+  }
+
+  return {
+    audio: {
+      deviceId: { exact: selectedInput }
+    },
+    video: false
+  }
+}
+
+function getTrackLabel(kind: TrackKind): string {
+  return kind === 'microphone' ? 'Microphone' : 'System audio'
+}
+
+function stopRuntime(runtime: TrackRuntime | null): Promise<void> {
+  if (!runtime) return Promise.resolve()
+
+  const recorderStop =
+    runtime.recorder.state === 'inactive'
+      ? Promise.resolve()
+      : new Promise<void>((resolve) => {
+          runtime.recorder.addEventListener('stop', () => resolve(), { once: true })
+          runtime.recorder.stop()
+        })
+
+  runtime.stream.getTracks().forEach((track) => track.stop())
+
+  return recorderStop.finally(() => {
+    void runtime.audioContext.close().catch(() => undefined)
+  })
 }
 
 export function useRecording(): UseRecordingReturn {
-  const [state, setState] = useState<RecordingState>({
+  const [state, setState] = useState<RecordingState>(initialState)
+  const runtimeRef = useRef<RuntimeState>({
     sessionId: null,
-    isRecording: false,
-    micLevel: 0,
-    micBands: Array.from({ length: 18 }, () => 0),
-    speakerLevel: 0,
-    speakerBands: Array.from({ length: 18 }, () => 0),
-    speakerAvailable: false,
-    elapsed: 0
+    isMounted: true,
+    isStarting: false,
+    isStopping: false,
+    startedAt: null,
+    rafId: null,
+    microphone: null,
+    system: null
   })
+  const selectedInputRef = useRef(initialState.selectedInput)
+  const startPromiseRef = useRef<Promise<void> | null>(null)
+  const stopPromiseRef = useRef<Promise<void> | null>(null)
 
-  const micRecorderRef = useRef<MediaRecorder | null>(null)
-  const speakerRecorderRef = useRef<MediaRecorder | null>(null)
-  const micAnalyserRef = useRef<AnalyserNode | null>(null)
-  const speakerAnalyserRef = useRef<AnalyserNode | null>(null)
-  const audioCtxRef = useRef<AudioContext | null>(null)
-  const rafRef = useRef<number>(0)
-  const startTimeRef = useRef<number>(0)
-  const sessionIdRef = useRef<string | null>(null)
-  const speakerAvailableRef = useRef(false)
-
-  function extractBands(analyser: AnalyserNode | null): { level: number; bands: number[] } {
-    if (!analyser) {
-      return { level: 0, bands: Array.from({ length: 18 }, () => 0) }
-    }
-
-    const frequencyData = new Uint8Array(analyser.frequencyBinCount)
-    analyser.getByteFrequencyData(frequencyData)
-
-    const level = frequencyData.reduce((sum, value) => sum + value, 0) / frequencyData.length / 255
-    const bandCount = 18
-    const bucketSize = Math.max(1, Math.floor(frequencyData.length / bandCount))
-    const bands = Array.from({ length: bandCount }, (_, index) => {
-      const start = index * bucketSize
-      const end = Math.min(frequencyData.length, start + bucketSize)
-      const slice = frequencyData.slice(start, end)
-      if (slice.length === 0) return 0
-      return slice.reduce((sum, value) => sum + value, 0) / slice.length / 255
-    })
-
-    return { level, bands }
-  }
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function startRecording(): Promise<void> {
-      const { sessionId } = await window.recordingApi.start()
-      if (cancelled) {
-        await window.recordingApi.cancel(sessionId)
-        return
-      }
-      sessionIdRef.current = sessionId
-
-      const audioCtx = new AudioContext()
-      audioCtxRef.current = audioCtx
-
-      // Microphone
-      const micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-      const micSrc = audioCtx.createMediaStreamSource(micStream)
-      const micAnalyser = audioCtx.createAnalyser()
-      micAnalyser.fftSize = 256
-      micSrc.connect(micAnalyser)
-      micAnalyserRef.current = micAnalyser
-
-      const micRecorder = new MediaRecorder(micStream)
-      micRecorderRef.current = micRecorder
-      micRecorder.ondataavailable = async (e): Promise<void> => {
-        if (e.data.size > 0 && sessionIdRef.current) {
-          const buf = await e.data.arrayBuffer()
-          await window.recordingApi.sendChunk(sessionIdRef.current, 'mic', buf)
+  const updateTrack = useCallback(
+    (kind: TrackKind, updater: (prev: TrackState) => TrackState): void => {
+      setState((prev) => {
+        if (kind === 'microphone') {
+          return { ...prev, microphone: updater(prev.microphone) }
         }
-      }
-      micRecorder.start(1000)
+        return { ...prev, system: updater(prev.system) }
+      })
+    },
+    []
+  )
 
-      // System audio
-      try {
-        const sources = await window.recordingApi.getDesktopSources()
-        if (sources.length > 0) {
-          const speakerStream = await navigator.mediaDevices.getUserMedia({
-            audio: { mandatory: { chromeMediaSource: 'desktop' } },
-            video: {
-              mandatory: {
-                chromeMediaSource: 'desktop',
-                chromeMediaSourceId: sources[0].id,
-                minWidth: 1,
-                maxWidth: 1,
-                minHeight: 1,
-                maxHeight: 1
-              }
-            }
-          } as MediaStreamConstraints)
+  const setTrackStatus = useCallback(
+    (kind: TrackKind, status: TrackStatus, available?: boolean) => {
+      updateTrack(kind, (prev) => ({
+        ...prev,
+        status,
+        available: available ?? prev.available
+      }))
+    },
+    [updateTrack]
+  )
 
-          speakerStream.getVideoTracks().forEach((t) => t.stop())
-          const audioOnly = new MediaStream(speakerStream.getAudioTracks())
+  const appendTrackLog = useCallback(
+    (kind: TrackKind, message: string) => {
+      updateTrack(kind, (prev) => ({
+        ...prev,
+        logs: limitLogs([...prev.logs, createTrackLogMessage(message)])
+      }))
+    },
+    [updateTrack]
+  )
 
-          const speakerSrc = audioCtx.createMediaStreamSource(audioOnly)
-          const speakerAnalyser = audioCtx.createAnalyser()
-          speakerAnalyser.fftSize = 256
-          speakerSrc.connect(speakerAnalyser)
-          speakerAnalyserRef.current = speakerAnalyser
+  const setTrackMetrics = useCallback(
+    (kind: TrackKind, analyser: AnalyserNode | null) => {
+      const { level, bars } = readBands(analyser)
+      updateTrack(kind, (prev) => ({
+        ...prev,
+        level,
+        bars
+      }))
+    },
+    [updateTrack]
+  )
 
-          const speakerRecorder = new MediaRecorder(audioOnly)
-          speakerRecorderRef.current = speakerRecorder
-          speakerRecorder.ondataavailable = async (e): Promise<void> => {
-            if (e.data.size > 0 && sessionIdRef.current) {
-              const buf = await e.data.arrayBuffer()
-              await window.recordingApi.sendChunk(sessionIdRef.current, 'speaker', buf)
-            }
-          }
-          speakerRecorder.start(1000)
-          speakerAvailableRef.current = true
-        }
-      } catch {
-        speakerAvailableRef.current = false
-      }
+  const sampleMeters = useCallback((): void => {
+    if (!runtimeRef.current.isMounted) return
 
-      startTimeRef.current = Date.now()
+    setTrackMetrics('microphone', runtimeRef.current.microphone?.analyser ?? null)
+    setTrackMetrics('system', runtimeRef.current.system?.analyser ?? null)
 
-      if (!cancelled) {
-        setState((prev) => ({
-          ...prev,
-          sessionId,
-          isRecording: true,
-          speakerAvailable: speakerAvailableRef.current
-        }))
-      }
+    runtimeRef.current.rafId = window.requestAnimationFrame(sampleMeters)
+  }, [setTrackMetrics])
 
-      function animate(): void {
-        rafRef.current = requestAnimationFrame(animate)
-
-        const micData = extractBands(micAnalyserRef.current)
-        const speakerData = extractBands(speakerAnalyserRef.current)
-
-        setState((prev) => ({
-          ...prev,
-          elapsed: Math.floor((Date.now() - startTimeRef.current) / 1000),
-          micLevel: micData.level,
-          micBands: micData.bands,
-          speakerLevel: speakerData.level,
-          speakerBands: speakerData.bands
-        }))
-      }
-      animate()
+  const clearRuntime = useCallback(() => {
+    const runtime = runtimeRef.current
+    runtime.sessionId = null
+    runtime.startedAt = null
+    runtime.isStarting = false
+    runtime.isStopping = false
+    if (runtime.rafId !== null) {
+      window.cancelAnimationFrame(runtime.rafId)
+      runtime.rafId = null
     }
-
-    startRecording().catch(console.error)
-
-    return () => {
-      cancelled = true
-      cancelAnimationFrame(rafRef.current)
-      micRecorderRef.current?.stop()
-      speakerRecorderRef.current?.stop()
-      audioCtxRef.current?.close()
-    }
+    runtime.microphone = null
+    runtime.system = null
   }, [])
 
-  const stop = useCallback(async (): Promise<void> => {
-    if (!sessionIdRef.current) return
+  const resetRuntime = useCallback(() => {
+    clearRuntime()
+    setState((prev) => ({
+      ...prev,
+      sessionId: null,
+      isStarting: false,
+      isStopping: false,
+      elapsed: 0,
+      microphone: createTrackState(['Waiting for microphone input...']),
+      system: createTrackState(['Waiting for system audio...'])
+    }))
+  }, [clearRuntime])
 
-    cancelAnimationFrame(rafRef.current)
+  const cleanupRuntime = useCallback(async () => {
+    if (runtimeRef.current.rafId !== null) {
+      window.cancelAnimationFrame(runtimeRef.current.rafId)
+      runtimeRef.current.rafId = null
+    }
 
     await Promise.all([
-      micRecorderRef.current
-        ? new Promise<void>((res) => {
-            micRecorderRef.current!.addEventListener('stop', () => res(), { once: true })
-            micRecorderRef.current!.stop()
-          })
-        : Promise.resolve(),
-      speakerRecorderRef.current
-        ? new Promise<void>((res) => {
-            speakerRecorderRef.current!.addEventListener('stop', () => res(), { once: true })
-            speakerRecorderRef.current!.stop()
-          })
-        : Promise.resolve()
+      stopRuntime(runtimeRef.current.microphone),
+      stopRuntime(runtimeRef.current.system)
     ])
 
-    // Allow final IPC writes to complete
-    await new Promise((r) => setTimeout(r, 300))
-
-    await window.recordingApi.stop(sessionIdRef.current, speakerAvailableRef.current)
-    audioCtxRef.current?.close()
-    window.recordingApi.closeWindow()
+    runtimeRef.current.microphone = null
+    runtimeRef.current.system = null
   }, [])
 
-  return { ...state, stop }
+  const enumerateAudioInputs = useCallback(async (): Promise<void> => {
+    const devices = await navigator.mediaDevices.enumerateDevices()
+    const inputs = devices
+      .filter((device) => device.kind === 'audioinput')
+      .map((device, index) => ({
+        value: device.deviceId || `device-${index}`,
+        label: device.label || `Microphone ${index + 1}`
+      }))
+
+    const deduped = Array.from(new Map(inputs.map((item) => [item.value, item])).values())
+    setState((prev) => {
+      const selectedInput =
+        deduped.length > 0 && deduped.some((input) => input.value === prev.selectedInput)
+          ? prev.selectedInput
+          : (deduped[0]?.value ?? 'default')
+
+      return {
+        ...prev,
+        audioInputs: deduped,
+        selectedInput
+      }
+    })
+  }, [])
+
+  const startTrack = useCallback(
+    async (
+      kind: TrackKind,
+      stream: MediaStream,
+      sink: 'mic' | 'speaker'
+    ): Promise<TrackRuntime> => {
+      const audioTracks = stream.getAudioTracks()
+      if (audioTracks.length === 0) {
+        stream.getTracks().forEach((track) => track.stop())
+        throw new Error(`${getTrackLabel(kind)} track is unavailable`)
+      }
+
+      const audioContext = new AudioContext()
+      const source = audioContext.createMediaStreamSource(stream)
+      const analyser = audioContext.createAnalyser()
+      analyser.fftSize = 256
+      source.connect(analyser)
+
+      const mimeType = getPreferredMimeType()
+      const recorder =
+        mimeType === '' ? new MediaRecorder(stream) : new MediaRecorder(stream, { mimeType })
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size === 0 || !runtimeRef.current.sessionId) return
+        void event.data.arrayBuffer().then((buffer) => {
+          void window.recordingApi.sendChunk(runtimeRef.current.sessionId!, sink, buffer)
+        })
+      }
+
+      recorder.onerror = () => {
+        const message = `${getTrackLabel(kind)} recorder failed`
+        appendTrackLog(kind, message)
+        setTrackStatus(kind, 'error', false)
+      }
+
+      recorder.start(1000)
+
+      appendTrackLog(kind, `${getTrackLabel(kind)} track started`)
+      setTrackStatus(kind, 'recording', true)
+
+      return {
+        stream,
+        recorder,
+        audioContext,
+        analyser
+      }
+    },
+    [appendTrackLog, setTrackStatus]
+  )
+
+  const start = useCallback(async (): Promise<void> => {
+    if (startPromiseRef.current) return startPromiseRef.current
+    if (runtimeRef.current.sessionId || runtimeRef.current.isStarting) return
+
+    const promise = (async () => {
+      try {
+        runtimeRef.current.isStarting = true
+        setState((prev) => ({ ...prev, isStarting: true }))
+
+        const { sessionId } = await window.recordingApi.start()
+        runtimeRef.current.sessionId = sessionId
+        setState((prev) => ({ ...prev, sessionId }))
+
+        try {
+          setTrackStatus('microphone', 'starting', false)
+          appendTrackLog('microphone', 'Requesting microphone access...')
+          const micStream = await navigator.mediaDevices.getUserMedia(
+            createMicConstraints(selectedInputRef.current)
+          )
+          runtimeRef.current.microphone = await startTrack('microphone', micStream, 'mic')
+        } catch (error) {
+          const err = error instanceof Error ? error : new Error('Failed to start microphone')
+          setTrackStatus('microphone', 'error', false)
+          appendTrackLog('microphone', `Error: ${err.message}`)
+          await window.recordingApi.cancel(sessionId).catch(() => undefined)
+          clearRuntime()
+          setState((prev) => ({ ...prev, sessionId: null }))
+          return
+        }
+
+        try {
+          setTrackStatus('system', 'starting', false)
+          appendTrackLog('system', 'Requesting system audio access...')
+          const systemStream = await navigator.mediaDevices.getDisplayMedia({
+            audio: true,
+            video: false
+          })
+          runtimeRef.current.system = await startTrack('system', systemStream, 'speaker')
+        } catch (error) {
+          const err = error instanceof Error ? error : new Error('System audio is not supported')
+          setTrackStatus('system', 'error', false)
+          appendTrackLog('system', `Error: ${err.message}`)
+        }
+
+        runtimeRef.current.startedAt = Date.now()
+        runtimeRef.current.rafId = window.requestAnimationFrame(sampleMeters)
+        runtimeRef.current.isStarting = false
+        setState((prev) => ({ ...prev, isStarting: false }))
+      } finally {
+        runtimeRef.current.isStarting = false
+        setState((prev) => ({ ...prev, isStarting: false }))
+      }
+    })().finally(() => {
+      startPromiseRef.current = null
+    })
+
+    startPromiseRef.current = promise
+    return promise
+  }, [appendTrackLog, resetRuntime, sampleMeters, setTrackStatus, startTrack])
+
+  const stop = useCallback(async (): Promise<void> => {
+    if (stopPromiseRef.current) return stopPromiseRef.current
+    if (!runtimeRef.current.sessionId) return
+
+    const promise = (async () => {
+      const sessionId = runtimeRef.current.sessionId
+      const hasSystemAudio = runtimeRef.current.system !== null
+
+      runtimeRef.current.isStopping = true
+      setState((prev) => ({ ...prev, isStopping: true }))
+      setTrackStatus('microphone', 'stopping')
+      setTrackStatus('system', 'stopping')
+
+      if (runtimeRef.current.rafId !== null) {
+        window.cancelAnimationFrame(runtimeRef.current.rafId)
+        runtimeRef.current.rafId = null
+      }
+
+      await cleanupRuntime()
+
+      if (!sessionId) return
+
+      await new Promise((resolve) => window.setTimeout(resolve, 250))
+      await window.recordingApi.stop(sessionId, hasSystemAudio)
+      resetRuntime()
+      window.recordingApi.closeWindow()
+    })().finally(() => {
+      runtimeRef.current.isStopping = false
+      setState((prev) => ({ ...prev, isStopping: false }))
+      stopPromiseRef.current = null
+    })
+
+    stopPromiseRef.current = promise
+    return promise
+  }, [cleanupRuntime, resetRuntime, setTrackStatus, state.system.available, state.system.status])
+
+  const cancel = useCallback(async (): Promise<void> => {
+    if (stopPromiseRef.current) return stopPromiseRef.current
+    if (!runtimeRef.current.sessionId) {
+      window.recordingApi.closeWindow()
+      return
+    }
+
+    const promise = (async () => {
+      if (runtimeRef.current.rafId !== null) {
+        window.cancelAnimationFrame(runtimeRef.current.rafId)
+        runtimeRef.current.rafId = null
+      }
+
+      await cleanupRuntime()
+      const sessionId = runtimeRef.current.sessionId
+      if (sessionId) {
+        await window.recordingApi.cancel(sessionId).catch(() => undefined)
+      }
+      resetRuntime()
+      window.recordingApi.closeWindow()
+    })().finally(() => {
+      stopPromiseRef.current = null
+    })
+
+    stopPromiseRef.current = promise
+    return promise
+  }, [cleanupRuntime, resetRuntime])
+
+  useEffect(() => {
+    runtimeRef.current.isMounted = true
+    void enumerateAudioInputs()
+
+    const onDeviceChange = (): void => {
+      void enumerateAudioInputs()
+    }
+
+    navigator.mediaDevices.addEventListener('devicechange', onDeviceChange)
+
+    void start().catch((error) => {
+      const message = error instanceof Error ? error.message : 'Failed to start capture'
+      appendTrackLog('microphone', `Error: ${message}`)
+      setTrackStatus('microphone', 'error', false)
+      appendTrackLog('system', `Error: ${message}`)
+      setTrackStatus('system', 'error', false)
+    })
+
+    return () => {
+      runtimeRef.current.isMounted = false
+      navigator.mediaDevices.removeEventListener('devicechange', onDeviceChange)
+      void cancel()
+    }
+  }, [appendTrackLog, cancel, enumerateAudioInputs, setTrackStatus, start])
+
+  useEffect(() => {
+    if (runtimeRef.current.startedAt === null) return
+
+    const timer = window.setInterval(() => {
+      if (runtimeRef.current.startedAt === null) return
+      setState((prev) => {
+        const nextElapsed = Math.floor((Date.now() - runtimeRef.current.startedAt!) / 1000)
+        return prev.elapsed === nextElapsed ? prev : { ...prev, elapsed: nextElapsed }
+      })
+    }, 250)
+
+    return () => window.clearInterval(timer)
+  }, [state.sessionId, state.isStarting, state.isStopping])
+
+  useEffect(() => {
+    if (runtimeRef.current.startedAt === null) return
+    const ticker = window.setInterval(() => {
+      if (!runtimeRef.current.isMounted) return
+      if (runtimeRef.current.microphone?.analyser) {
+        const { level, bars } = readBands(runtimeRef.current.microphone.analyser)
+        updateTrack('microphone', (prev) => ({ ...prev, level, bars }))
+      }
+      if (runtimeRef.current.system?.analyser) {
+        const { level, bars } = readBands(runtimeRef.current.system.analyser)
+        updateTrack('system', (prev) => ({ ...prev, level, bars }))
+      }
+    }, 80)
+
+    return () => window.clearInterval(ticker)
+  }, [updateTrack, state.sessionId])
+
+  return {
+    ...state,
+    start,
+    stop,
+    cancel,
+    setSelectedInput: (value: string) => {
+      selectedInputRef.current = value
+      setState((prev) => ({ ...prev, selectedInput: value }))
+    }
+  }
 }

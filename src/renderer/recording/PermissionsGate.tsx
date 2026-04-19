@@ -32,70 +32,79 @@ export function PermissionsGate({ permissions, platform, onRecheck }: Props): Re
 
   return (
     <div
-      className="w-[420px] rounded-[30px] border border-[rgba(255,255,255,0.6)] bg-[linear-gradient(180deg,rgba(255,248,244,0.96),rgba(255,255,255,0.88))] p-5 shadow-[0_28px_80px_rgba(77,42,66,0.18)] backdrop-blur-[24px]"
+      className="w-[460px] rounded-[34px] border border-[rgba(255,255,255,0.7)] bg-[linear-gradient(180deg,rgba(255,249,245,0.98),rgba(255,255,255,0.9))] p-5 shadow-[0_28px_90px_rgba(77,42,66,0.18)] backdrop-blur-[24px]"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
       <div style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#b57a70]">
           Access check
         </p>
-        <p className="mt-2 text-lg font-semibold text-[#24191f]">Permissions needed to record</p>
+        <p className="mt-2 text-2xl font-semibold text-[#24191f]">Enable recording access</p>
         <p className="mt-2 text-sm leading-6 text-[#7f6671]">
-          Enable both inputs before starting so the recording window can capture voice and system
-          audio correctly.
+          Grant the microphone first. On macOS, screen recording is also needed for system audio.
         </p>
 
         <div className="mb-4 mt-5 flex flex-col gap-3">
-          <div className="flex items-center justify-between rounded-[24px] border border-[#ecd8cf] bg-[#fffaf7] px-4 py-4">
-            <div className="flex items-center gap-2">
-              <span>🎤</span>
-              <span className="text-xs text-[#5b4653]">Microphone</span>
-              <span className="text-[9px] uppercase font-medium text-red-400 bg-red-50 px-1.5 py-0.5 rounded">
-                required
-              </span>
-            </div>
-            {permissions.mic ? (
-              <span className="text-xs text-emerald-500">✓ granted</span>
-            ) : (
-              <Button
-                size="xs"
-                variant="subtle"
-                color="sunset"
-                onClick={() => openSettings('microphone')}
-              >
-                Open Settings
-              </Button>
-            )}
-          </div>
-
-          {platform === 'darwin' && (
-            <div className="flex items-center justify-between rounded-[24px] border border-[#ecd8cf] bg-[#fffaf7] px-4 py-4">
+          <div className="rounded-[26px] border border-[#ecd8cf] bg-white/78 px-4 py-4 shadow-[0_12px_24px_rgba(77,42,66,0.05)]">
+            <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <span>🖥</span>
-                <span className="text-xs text-[#5b4653]">Screen Recording</span>
-                <span className="text-[9px] uppercase font-medium text-[#ccb8c1] bg-[#f8f0f5] px-1.5 py-0.5 rounded">
-                  for system audio
-                </span>
+                <span className="text-lg">🎤</span>
+                <div>
+                  <p className="text-sm font-semibold text-[#24191f]">Microphone</p>
+                  <p className="text-xs text-[#7f6671]">Required to start recording.</p>
+                </div>
               </div>
-              {permissions.screenRecording ? (
-                <span className="text-xs text-emerald-500">✓ granted</span>
+              {permissions.mic ? (
+                <span className="rounded-full border border-[#bfe9cf] bg-[#e9fff3] px-2.5 py-1 text-[11px] font-semibold text-[#1a8f57]">
+                  Granted
+                </span>
               ) : (
                 <Button
                   size="xs"
-                  variant="subtle"
-                  color="lilac"
-                  onClick={() => openSettings('screenRecording')}
+                  radius="xl"
+                  color="sunset"
+                  variant="light"
+                  onClick={() => openSettings('microphone')}
                 >
                   Open Settings
                 </Button>
               )}
+            </div>
+          </div>
+
+          {platform === 'darwin' && (
+            <div className="rounded-[26px] border border-[#ecd8cf] bg-white/78 px-4 py-4 shadow-[0_12px_24px_rgba(77,42,66,0.05)]">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🖥</span>
+                  <div>
+                    <p className="text-sm font-semibold text-[#24191f]">Screen Recording</p>
+                    <p className="text-xs text-[#7f6671]">Needed only for system audio.</p>
+                  </div>
+                </div>
+                {permissions.screenRecording ? (
+                  <span className="rounded-full border border-[#bfe9cf] bg-[#e9fff3] px-2.5 py-1 text-[11px] font-semibold text-[#1a8f57]">
+                    Granted
+                  </span>
+                ) : (
+                  <Button
+                    size="xs"
+                    radius="xl"
+                    color="lilac"
+                    variant="light"
+                    onClick={() => openSettings('screenRecording')}
+                  >
+                    Open Settings
+                  </Button>
+                )}
+              </div>
             </div>
           )}
         </div>
 
         <div className="flex gap-2">
           <Button
-            size="sm"
+            size="md"
             flex={1}
             color="sunset"
             radius="xl"
@@ -106,8 +115,8 @@ export function PermissionsGate({ permissions, platform, onRecheck }: Props): Re
             {canContinue ? (checking ? 'Checking…' : 'Start Recording') : 'Recheck'}
           </Button>
           <Button
-            size="sm"
-            variant="subtle"
+            size="md"
+            variant="light"
             color="gray"
             radius="xl"
             onClick={() => window.recordingApi.closeWindow()}

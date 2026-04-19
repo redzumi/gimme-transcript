@@ -1,112 +1,149 @@
-import React, { useState } from 'react'
+import React, { useMemo } from 'react'
 import { Button } from '@mantine/core'
-import { VuMeter } from './VuMeter'
 import { useRecording } from './useRecording'
+import type { TrackStatus } from './recordingUtils'
 
 function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  const minutes = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+}
+
+function shortStatus(status: TrackStatus, available: boolean): string {
+  if (status === 'recording') return 'on'
+  if (status === 'starting') return '...'
+  if (status === 'stopping') return 'saving'
+  if (status === 'error') return 'off'
+  return available ? 'ready' : 'off'
+}
+
+function meterColor(available: boolean, level: number): string {
+  if (!available) return 'bg-[#e9d8d0]'
+  if (level > 0.6) return 'bg-[#ff4d6d]'
+  if (level > 0.25) return 'bg-[#ff9d53]'
+  return 'bg-[#d8b9aa]'
+}
+
+function CompactTrack(props: {
+  title: string
+  icon: string
+  status: TrackStatus
+  level: number
+  bars: number[]
+  available: boolean
+}): React.JSX.Element {
+  return (
+    <div className="rounded-[11px] border border-[#ead8cf] bg-white px-[4px] py-[3px]">
+      <div className="flex items-center justify-between gap-1">
+        <div className="flex min-w-0 items-center gap-1">
+          <span className="flex h-4.5 w-4.5 items-center justify-center rounded-md bg-[#fff6f1] text-[9px]">
+            {props.icon}
+          </span>
+          <span className="truncate text-[10px] font-semibold text-[#22181d]">{props.title}</span>
+        </div>
+        <span className="text-[8px] text-[#8c7580]">
+          {shortStatus(props.status, props.available)}
+        </span>
+      </div>
+
+      <div className="mt-0.5 flex h-[11px] items-end gap-[1px] rounded-[7px] bg-[#fff8f4] px-[1px] py-[2px]">
+        {props.bars.slice(0, 3).map((bar, index) => {
+          const active = props.available ? Math.max(0.16, bar) : 0.08
+          return (
+            <div
+              key={`${props.title}-${index}`}
+              className={`w-[3px] flex-none rounded-full ${meterColor(props.available, props.level)}`}
+              style={{
+                height: `${Math.max(4, active * 100)}%`,
+                opacity: props.available ? 0.35 + active * 0.65 : 0.16
+              }}
+            />
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 export function RecordingPanel(): React.JSX.Element {
-  const {
-    isRecording,
-    micLevel,
-    micBands,
-    speakerLevel,
-    speakerBands,
-    speakerAvailable,
-    elapsed,
-    stop
-  } = useRecording()
-  const [stopping, setStopping] = useState(false)
-
-  const headline = stopping
-    ? 'Saving capture…'
-    : isRecording
-      ? 'Recording in progress'
-      : 'Preparing capture'
-
-  async function handleStop(): Promise<void> {
-    setStopping(true)
-    await stop()
-  }
+  const { elapsed, isStarting, isStopping, microphone, stop, system } = useRecording()
+  const isLive = microphone.status === 'recording' || system.status === 'recording'
+  const title = useMemo(() => {
+    if (isStopping) return 'Saving'
+    if (isStarting) return 'Starting'
+    if (isLive) return 'Recording'
+    return 'Ready'
+  }, [isLive, isStarting, isStopping])
 
   return (
     <div
-      className="w-[420px] overflow-hidden rounded-[30px] border border-[rgba(255,255,255,0.6)] bg-[linear-gradient(180deg,rgba(255,248,244,0.96),rgba(255,255,255,0.88))] shadow-[0_28px_80px_rgba(77,42,66,0.18)] backdrop-blur-[24px]"
+      className="flex h-full w-full flex-col overflow-hidden rounded-[16px] border border-[#ead8cf] bg-[#fffaf5] shadow-[0_14px_36px_rgba(77,42,66,0.14)]"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
-      <div
-        className="border-b border-[#f3e5dd] px-5 py-4"
+      <header
+        className="flex items-center justify-between gap-1 border-b border-[#f0ded4] bg-white px-[7px] py-[3px]"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              {isRecording && !stopping && (
-                <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#ff4d6d] shadow-[0_0_0_6px_rgba(255,77,109,0.14)] animate-pulse" />
-              )}
-              <span className="text-[11px] font-semibold uppercase tracking-[0.26em] text-[#b57a70]">
-                Live capture
-              </span>
-            </div>
-            <p className="mt-2 text-lg font-semibold text-[#24191f]">{headline}</p>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#ff4d6d] shadow-[0_0_0_3px_rgba(255,77,109,0.14)] animate-pulse" />
+            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#b57a70]">
+              Live
+            </span>
           </div>
-
-          <div
-            className="rounded-[22px] bg-white/90 px-4 py-3 text-right shadow-[0_12px_26px_rgba(77,42,66,0.08)]"
-            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-          >
-            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#a38792]">
-              Elapsed
-            </p>
-            <p className="mt-1 text-2xl font-semibold tracking-[0.12em] text-[#24191f]">
-              {formatTime(elapsed)}
-            </p>
-          </div>
+          <p className="mt-0.5 text-[11px] font-semibold leading-none text-[#24191f]">{title}</p>
         </div>
-      </div>
 
-      <div
-        className="space-y-4 bg-[radial-gradient(circle_at_top,rgba(255,183,161,0.22),transparent_36%),linear-gradient(180deg,rgba(255,255,255,0.34),rgba(255,247,243,0.58))] px-5 py-5"
-        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-      >
         <div
-          className="grid grid-cols-[1fr_auto] items-center gap-4 rounded-[26px] border border-[#efdcd3] bg-white/72 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]"
+          className="flex items-center gap-1.5"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
-          <div>
-            <p className="text-sm font-medium text-[#24191f]">Dual-source capture</p>
-            <p className="mt-1 text-xs leading-6 text-[#7f6671]">
-              Microphone is always recorded. System audio joins automatically when available.
+          <div className="rounded-[10px] border border-[#edd9d1] bg-[#fffaf7] px-1.5 py-0.5 text-right">
+            <p className="text-[7px] font-semibold uppercase tracking-[0.12em] text-[#a3858f]">
+              Time
+            </p>
+            <p className="mt-0.5 text-[10px] font-semibold tracking-[0.04em] text-[#24191f]">
+              {formatTime(elapsed)}
             </p>
           </div>
 
           <Button
-            size="sm"
+            size="compact-xs"
             color="sunset"
             radius="xl"
-            loading={stopping}
-            disabled={!isRecording}
-            onClick={handleStop}
+            loading={isStopping}
+            disabled={isStarting || isStopping || !isLive}
+            onClick={() => {
+              void stop()
+            }}
           >
             Stop
           </Button>
         </div>
+      </header>
 
-        <div className="flex flex-col gap-4">
-          <VuMeter level={micLevel} bars={micBands} label="Microphone" icon="🎤" available={true} />
-          <VuMeter
-            level={speakerLevel}
-            bars={speakerBands}
-            label="System Audio"
-            icon="🔊"
-            available={speakerAvailable}
-          />
-        </div>
-      </div>
+      <main
+        className="grid grid-cols-2 gap-0.5 px-[3px] py-[3px]"
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      >
+        <CompactTrack
+          title="Mic"
+          icon="🎤"
+          status={microphone.status}
+          level={microphone.level}
+          bars={microphone.bars}
+          available={microphone.available}
+        />
+
+        <CompactTrack
+          title="System"
+          icon="🔊"
+          status={system.status}
+          level={system.level}
+          bars={system.bars}
+          available={system.status !== 'idle' || system.available}
+        />
+      </main>
     </div>
   )
 }
