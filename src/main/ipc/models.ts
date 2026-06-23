@@ -6,7 +6,8 @@ import { join } from 'path'
 import https from 'https'
 import http from 'http'
 import type { ClientRequest, IncomingMessage } from 'http'
-import type { WhisperModel, ModelInfo } from '../../renderer/src/types/ipc'
+import type { ModelInfo } from '../../renderer/src/types/ipc'
+import type { WhisperModel } from '../../renderer/src/types/ipc'
 import { getModelsDir } from '../storage/paths'
 
 const MODEL_SIZES: Record<WhisperModel, number> = {
@@ -27,24 +28,24 @@ const MODEL_URLS: Record<WhisperModel, string> = {
 
 const MODEL_ORDER: WhisperModel[] = ['tiny', 'base', 'small', 'medium', 'large']
 
-export function modelFileName(model: WhisperModel): string {
+export function modelFileName(model: string): string {
   return `ggml-${model}.bin`
 }
 
-export function modelPath(model: WhisperModel): string {
+export function modelPath(model: string): string {
   return join(getModelsDir(), modelFileName(model))
 }
 
-export function isModelDownloaded(model: WhisperModel): boolean {
+export function isModelDownloaded(model: string): boolean {
   return existsSync(modelPath(model))
 }
 
 export function getDownloadedModels(): WhisperModel[] {
-  return MODEL_ORDER.filter(isModelDownloaded)
+  return MODEL_ORDER.filter((m) => isModelDownloaded(m))
 }
 
-export function resolveDownloadedModel(preferred: WhisperModel): WhisperModel | null {
-  if (isModelDownloaded(preferred)) return preferred
+export function resolveDownloadedModel(preferred: string): WhisperModel | null {
+  if (isModelDownloaded(preferred)) return preferred as WhisperModel
   return getDownloadedModels()[0] ?? null
 }
 
@@ -60,7 +61,7 @@ interface ActiveDownload {
   cancel: () => void
 }
 
-const activeDownloads = new Map<WhisperModel, ActiveDownload>()
+const activeDownloads = new Map<string, ActiveDownload>()
 
 let modelsCache: ModelInfo[] | null = null
 
@@ -68,7 +69,7 @@ function invalidateModelsCache(): void {
   modelsCache = null
 }
 
-function downloadModel(model: WhisperModel): Promise<void> {
+function downloadModel(model: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const dest = modelPath(model)
     const url = MODEL_URLS[model]
@@ -190,14 +191,14 @@ export function registerModelHandlers(): void {
   ipcMain.handle('models:list', (): ModelInfo[] => {
     if (modelsCache) return modelsCache
     modelsCache = MODEL_ORDER.map((model) => ({
-      model,
+      model: model as string,
       sizeBytes: MODEL_SIZES[model],
       downloaded: isModelDownloaded(model)
     }))
     return modelsCache
   })
 
-  ipcMain.handle('models:download', async (_e, model: WhisperModel) => {
+  ipcMain.handle('models:download', async (_e, model: string) => {
     if (isModelDownloaded(model)) return
     if (activeDownloads.has(model)) return
     try {
@@ -210,12 +211,12 @@ export function registerModelHandlers(): void {
     }
   })
 
-  ipcMain.handle('models:cancel-download', (_e, model: WhisperModel) => {
+  ipcMain.handle('models:cancel-download', (_e, model: string) => {
     activeDownloads.get(model)?.cancel()
     activeDownloads.delete(model)
   })
 
-  ipcMain.handle('models:delete', (_e, model: WhisperModel) => {
+  ipcMain.handle('models:delete', (_e, model: string) => {
     const p = modelPath(model)
     if (existsSync(p)) unlinkSync(p)
     invalidateModelsCache()

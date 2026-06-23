@@ -1,5 +1,9 @@
 import { ipcMain } from 'electron'
-import { transcribeSession, cancelTranscription, transcribeAllSources } from '../whisper'
+import {
+  transcribeSession,
+  cancelTranscription,
+  transcribeAllSources
+} from '../transcription/dispatch'
 
 export function registerWhisperHandlers(): void {
   ipcMain.handle('whisper:transcribe', (_e, sessionId: string) => {

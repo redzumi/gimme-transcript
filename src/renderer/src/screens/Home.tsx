@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Text, Button, Group, ActionIcon, TextInput, Select, ScrollArea } from '@mantine/core'
-import type { Session, Speaker, WhisperModel } from '../types/ipc'
+import { Text, Button, Group, ActionIcon, TextInput, ScrollArea } from '@mantine/core'
+import type { Session, Speaker } from '../types/ipc'
 import { Logo } from '../components/Logo'
 
 interface ContextMenu {
@@ -45,8 +45,8 @@ function getSessionName(s: Session): string {
 export default function Home({ onOpenSession, onOpenSettings }: Props): React.JSX.Element {
   const [sessions, setSessions] = useState<Session[]>([])
   const [speakers, setSpeakers] = useState<Speaker[]>([])
-  const [currentModel, setCurrentModel] = useState<WhisperModel>('medium')
-  const [downloadedModels, setDownloadedModels] = useState<WhisperModel[]>([])
+  const [currentModel, setCurrentModel] = useState<string>('medium')
+  const [currentEngine, setCurrentEngine] = useState<string>('whisper')
   const [newSpeakerName, setNewSpeakerName] = useState('')
   const [addingSpeaker, setAddingSpeaker] = useState(false)
   const [search, setSearch] = useState('')
@@ -58,20 +58,17 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
   const renameInputRef = useRef<HTMLInputElement>(null)
 
   const reload = useCallback(async () => {
-    const [s, sp, settings, modelList] = await Promise.all([
+    const [s, sp, settings] = await Promise.all([
       window.api.invoke('sessions:list'),
       window.api.invoke('speakers:list'),
-      window.api.invoke('settings:get'),
-      window.api.invoke('models:list')
+      window.api.invoke('settings:get')
     ])
-    const availableModels = modelList.filter((m) => m.downloaded).map((m) => m.model)
-    const resolvedModel = availableModels.includes(settings.defaultModel)
-      ? settings.defaultModel
-      : (availableModels[0] ?? settings.defaultModel)
     setSessions(s)
     setSpeakers(sp)
-    setCurrentModel(resolvedModel)
-    setDownloadedModels(availableModels)
+    // Engine + model are chosen per-session on the Session screen; here we only
+    // carry the defaults for newly created sessions.
+    setCurrentModel(settings.defaultModel)
+    setCurrentEngine(settings.defaultEngine)
   }, [])
 
   useEffect(() => {
@@ -114,7 +111,9 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
     if (!files) return
     const created: Session[] = []
     for (const file of files) {
-      created.push(await window.api.invoke('sessions:create', file, currentModel, 'auto'))
+      created.push(
+        await window.api.invoke('sessions:create', file, currentModel, 'auto', currentEngine)
+      )
     }
     setSessions((prev) => [...created.reverse(), ...prev])
   }
@@ -137,7 +136,13 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
       }))
     const firstWords = segments[0]?.text.slice(0, 40) ?? 'Imported text'
     const name = firstWords.length < (segments[0]?.text.length ?? 0) ? firstWords + '…' : firstWords
-    const session = await window.api.invoke('sessions:create', path, currentModel, 'auto')
+    const session = await window.api.invoke(
+      'sessions:create',
+      path,
+      currentModel,
+      'auto',
+      currentEngine
+    )
     const updated = await window.api.invoke('sessions:update', session.id, {
       segments,
       status: 'done',
@@ -148,7 +153,13 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
 
   async function handleEmptySession(): Promise<void> {
     setNewMenuOpen(false)
-    const session = await window.api.invoke('sessions:create', '', currentModel, 'auto')
+    const session = await window.api.invoke(
+      'sessions:create',
+      '',
+      currentModel,
+      'auto',
+      currentEngine
+    )
     const updated = await window.api.invoke('sessions:update', session.id, {
       name: 'New session',
       status: 'done'
@@ -207,12 +218,6 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
     await window.api.invoke('speakers:delete', id)
   }
 
-  async function handleModelChange(model: string | null): Promise<void> {
-    if (!model) return
-    await window.api.invoke('settings:update', { defaultModel: model as WhisperModel })
-    setCurrentModel(model as WhisperModel)
-  }
-
   const filteredSessions = search.trim()
     ? sessions.filter((s) => getSessionName(s).toLowerCase().includes(search.trim().toLowerCase()))
     : sessions
@@ -260,15 +265,6 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
           <Logo size={28} />
         </div>
         <Group gap="xs">
-          {downloadedModels.length > 0 && (
-            <Select
-              size="xs"
-              value={downloadedModels.includes(currentModel) ? currentModel : downloadedModels[0]}
-              onChange={handleModelChange}
-              data={downloadedModels.map((m) => ({ value: m, label: m }))}
-              styles={{ input: { minWidth: 80 } }}
-            />
-          )}
           <ActionIcon
             variant="subtle"
             size="sm"

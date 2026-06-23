@@ -3,7 +3,15 @@ import { defineConfig } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
-  main: {},
+  main: {
+    build: {
+      rollupOptions: {
+        // onnxruntime-node loads a native addon at runtime; keep it external so
+        // it is required from node_modules (asarUnpack'd) instead of bundled.
+        external: ['onnxruntime-node']
+      }
+    }
+  },
   preload: {
     build: {
       rollupOptions: {

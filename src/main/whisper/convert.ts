@@ -27,7 +27,7 @@ function ffmpegInstallHint(): string {
   return 'Install with: sudo apt install ffmpeg  (or equivalent for your distro)'
 }
 
-function findFfmpeg(): string | null {
+export function findFfmpeg(): string | null {
   const cmd = process.platform === 'win32' ? 'where' : 'which'
   try {
     const result = execSync(`${cmd} ffmpeg`, {
@@ -95,7 +95,12 @@ export function convertForPlayback(
   })
 }
 
-export function prepareAudio(inputPath: string): Promise<ConvertResult> {
+// Resample any input to mono 16-bit PCM WAV at the given sample rate, with a 1s
+// silence tail. Used by whisper (16 kHz) and the T-one engine (8 kHz).
+export function prepareAudioResampled(
+  inputPath: string,
+  sampleRate: number
+): Promise<ConvertResult> {
   const ffmpeg = findFfmpeg()
   if (!ffmpeg) {
     return Promise.reject(
@@ -106,7 +111,7 @@ export function prepareAudio(inputPath: string): Promise<ConvertResult> {
     )
   }
 
-  const wavPath = join(tmpdir(), `whisper-${randomUUID()}.wav`)
+  const wavPath = join(tmpdir(), `transcribe-${randomUUID()}.wav`)
 
   return new Promise((resolve, reject) => {
     const proc = spawn(ffmpeg, [
@@ -116,7 +121,7 @@ export function prepareAudio(inputPath: string): Promise<ConvertResult> {
       '-af',
       'apad=pad_dur=1',
       '-ar',
-      '16000',
+      String(sampleRate),
       '-ac',
       '1',
       '-c:a',
@@ -134,4 +139,8 @@ export function prepareAudio(inputPath: string): Promise<ConvertResult> {
 
     proc.on('error', reject)
   })
+}
+
+export function prepareAudio(inputPath: string): Promise<ConvertResult> {
+  return prepareAudioResampled(inputPath, 16000)
 }

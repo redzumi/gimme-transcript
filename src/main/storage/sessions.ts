@@ -1,11 +1,10 @@
 import { readFileSync, writeFileSync, readdirSync, rmSync, existsSync } from 'fs'
 import { randomUUID } from 'crypto'
-import type { Session, AudioSource, WhisperModel } from '../../renderer/src/types/ipc'
+import type { Session, AudioSource } from '../../renderer/src/types/ipc'
 import { getSessionPath, getSessionsDir } from './paths'
 
 function migrate(session: Session): Session {
   const s = { ...session }
-  // v1 → v2: backfill schemaVersion and audioSources
   if (!s.schemaVersion) {
     s.schemaVersion = 1
   }
@@ -19,6 +18,10 @@ function migrate(session: Session): Session {
       }
     ]
     s.schemaVersion = 2
+  }
+  if (!s.engine) {
+    s.engine = 'whisper'
+    s.schemaVersion = 3
   }
   return s
 }
@@ -52,7 +55,12 @@ export function getSession(id: string): Session | null {
   return read(id)
 }
 
-export function createSession(audioFile: string, model: WhisperModel, language: string): Session {
+export function createSession(
+  audioFile: string,
+  model: string,
+  language: string,
+  engine: string = 'whisper'
+): Session {
   const defaultName =
     audioFile
       .split('/')
@@ -60,10 +68,11 @@ export function createSession(audioFile: string, model: WhisperModel, language: 
       ?.replace(/\.[^.]+$/, '') ?? audioFile
   const sourceId = randomUUID()
   const session: Session = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     id: randomUUID(),
     name: defaultName || 'Session',
     createdAt: new Date().toISOString(),
+    engine,
     audioFile,
     audioSources: [{ id: sourceId, path: audioFile, label: 'Audio', speakerId: null }],
     model,
@@ -77,7 +86,7 @@ export function createSession(audioFile: string, model: WhisperModel, language: 
 
 export function createRecordedSession(
   audioSources: AudioSource[],
-  model: WhisperModel,
+  model: string,
   language: string
 ): Session {
   const firstName =
@@ -86,10 +95,11 @@ export function createRecordedSession(
       .pop()
       ?.replace(/\.[^.]+$/, '') || 'Recording'
   const session: Session = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     id: randomUUID(),
     name: firstName,
     createdAt: new Date().toISOString(),
+    engine: 'whisper',
     audioSources,
     model,
     language,

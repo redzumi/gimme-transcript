@@ -5,6 +5,7 @@ import { getSettingsPath } from './paths'
 
 function defaults(): Settings {
   return {
+    defaultEngine: 'whisper',
     defaultModel: 'medium',
     defaultLanguage: 'auto',
     storagePath: app.getPath('userData')

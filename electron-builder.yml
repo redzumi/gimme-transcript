@@ -11,6 +11,9 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 asarUnpack:
   - resources/**
+  # onnxruntime-node ships a native .node/.dylib (used by the T-one engine) that
+  # cannot be loaded from inside the read-only asar archive.
+  - node_modules/onnxruntime-node/**
 win:
   executableName: gimme-transcript
 nsis:

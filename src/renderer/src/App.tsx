@@ -25,10 +25,10 @@ export default function App(): React.JSX.Element {
   async function checkStartupState(): Promise<void> {
     setCheckingPermissions(true)
     try {
-      const [perms, currentPlatform, models] = await Promise.all([
+      const [perms, currentPlatform, engines] = await Promise.all([
         window.api.invoke('recording:check-permissions'),
         window.api.invoke('recording:get-platform'),
-        window.api.invoke('models:list')
+        window.api.invoke('engines:list')
       ])
 
       setPermissions(perms)
@@ -42,8 +42,9 @@ export default function App(): React.JSX.Element {
         return
       }
 
-      const hasModel = models.some((m) => m.downloaded)
-      setScreen(hasModel ? { name: 'home' } : { name: 'firstLaunch' })
+      // Ready if any engine can transcribe now (model downloaded or API key set).
+      const hasReadyEngine = engines.some((e) => e.status === 'available')
+      setScreen(hasReadyEngine ? { name: 'home' } : { name: 'firstLaunch' })
     } finally {
       setCheckingPermissions(false)
     }

@@ -6,6 +6,7 @@ import { registerModelHandlers } from './models'
 import { registerWhisperHandlers } from './whisper'
 import { registerAudioHandlers } from './audio'
 import { registerRecordingHandlers } from './recording'
+import { registerEngineHandlers } from './engines'
 
 export function registerHandlers(): void {
   registerSessionHandlers()
@@ -16,4 +17,5 @@ export function registerHandlers(): void {
   registerWhisperHandlers()
   registerAudioHandlers()
   registerRecordingHandlers()
+  registerEngineHandlers()
 }

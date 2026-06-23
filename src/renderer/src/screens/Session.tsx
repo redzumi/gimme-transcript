@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { Text, Button, Group, Progress, Select, Modal, Checkbox } from '@mantine/core'
-import type { Session, Segment, Speaker, WhisperModel } from '../types/ipc'
+import type { Session, Segment, Speaker, EngineInfo, EngineModelInfo } from '../types/ipc'
 
 interface Props {
   sessionId: string
@@ -34,7 +34,8 @@ const SUPPORTED_EXTS = new Set(['mp3', 'm4a', 'mp4', 'wav', 'ogg', 'flac', 'aac'
 export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.Element {
   const [session, setSession] = useState<Session | null>(null)
   const [speakers, setSpeakers] = useState<Speaker[]>([])
-  const [downloadedModels, setDownloadedModels] = useState<WhisperModel[]>([])
+  const [engines, setEngines] = useState<EngineInfo[]>([])
+  const [engineModels, setEngineModels] = useState<EngineModelInfo[]>([])
   const [progress, setProgress] = useState(0)
   const [anchorIdx, setAnchorIdx] = useState<number | null>(null)
   const [focusIdx, setFocusIdx] = useState<number | null>(null)
@@ -64,10 +65,10 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
   })
 
   const reload = useCallback(async () => {
-    const [s, sp, modelList] = await Promise.all([
+    const [s, sp, engineList] = await Promise.all([
       window.api.invoke('sessions:get', sessionId),
       window.api.invoke('speakers:list'),
-      window.api.invoke('models:list')
+      window.api.invoke('engines:list')
     ])
     if (s?.convertedAudioPath && !s.audioConvertedCBR) {
       await window.api.invoke('audio:reset-converted', sessionId)
@@ -75,8 +76,23 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
     }
     setSession(s)
     setSpeakers(sp)
-    setDownloadedModels(modelList.filter((m) => m.downloaded).map((m) => m.model))
+    setEngines(engineList)
   }, [sessionId])
+
+  // Refetch the model list whenever the session's engine changes (incl. when the
+  // user switches engine in the picker), so the Model dropdown shows that
+  // engine's models rather than the previous engine's.
+  useEffect(() => {
+    const engineId = session?.engine
+    if (!engineId) return
+    let active = true
+    void window.api.invoke('engines:models', engineId).then((m) => {
+      if (active) setEngineModels(m)
+    })
+    return () => {
+      active = false
+    }
+  }, [session?.engine])
 
   useEffect(() => {
     void Promise.resolve().then(reload)
@@ -297,6 +313,21 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
     }
   }, [audioSrc])
 
+  // Keep session.model valid for the selected engine (e.g. after switching
+  // engines, default to that engine's first usable model).
+  useEffect(() => {
+    if (!session) return
+    const info = engines.find((e) => e.id === session.engine)
+    const cloud = !!info?.features.requiresNetwork
+    const selectable = cloud ? engineModels : engineModels.filter((m) => m.downloaded)
+    if (selectable.length === 0) return
+    if (!selectable.some((m) => m.id === session.model)) {
+      void window.api
+        .invoke('sessions:update', sessionId, { model: selectable[0].id })
+        .then(setSession)
+    }
+  }, [session, engines, engineModels, sessionId])
+
   async function handleTranscribe(): Promise<void> {
     setError(null)
     setSession((prev) => (prev ? { ...prev, status: 'transcribing' } : prev))
@@ -334,6 +365,26 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
   }, [session])
 
   if (!session) return <div className="h-screen bg-[var(--app-shell)]" />
+
+  const currentEngine = session.engine
+  const engineInfo = engines.find((e) => e.id === currentEngine)
+  const engineLangs = engineInfo?.languages ?? []
+  // Cloud engines (OpenAI) need no local model file; locals (whisper, T-one) do.
+  const isCloud = !!engineInfo?.features.requiresNetwork
+  const selectableModels = isCloud ? engineModels : engineModels.filter((m) => m.downloaded)
+  const selectedModel = selectableModels.find((m) => m.id === session.model) ?? selectableModels[0]
+  // Engine readiness comes from engines:list status (model downloaded / key set).
+  const notReady = engineInfo ? engineInfo.status !== 'available' : false
+  const readyHint =
+    engineInfo?.status === 'needs-key'
+      ? 'Add your API key in Settings.'
+      : engineInfo?.status === 'needs-download'
+        ? 'Download a model in Settings.'
+        : ''
+  const costHint =
+    isCloud && selectedModel?.pricePerMinute
+      ? `~$${selectedModel.pricePerMinute.toFixed(3)}/min`
+      : ''
 
   return (
     <div
@@ -542,27 +593,47 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
             </p>
             <p className="text-base font-semibold text-[#24191f]">{sessionName}</p>
           </div>
-          {downloadedModels.length === 0 ? (
-            <p className="text-xs text-amber-600 text-center max-w-xs">
-              No models downloaded. Go to Settings to download one.
-            </p>
-          ) : (
+          <div className="flex flex-col items-center gap-3">
             <div className="flex gap-4 items-end">
-              <Select
-                label="Model"
-                size="sm"
-                value={
-                  downloadedModels.includes(session.model) ? session.model : downloadedModels[0]
-                }
-                onChange={async (v) => {
-                  if (!v) return
-                  const updated = await window.api.invoke('sessions:update', sessionId, {
-                    model: v as WhisperModel
-                  })
-                  setSession(updated)
-                }}
-                data={downloadedModels.map((m) => ({ value: m, label: m }))}
-              />
+              {engines.length > 1 && (
+                <Select
+                  label="Engine"
+                  size="sm"
+                  value={currentEngine}
+                  onChange={async (v) => {
+                    if (!v) return
+                    const info = engines.find((e) => e.id === v)
+                    const patch: Partial<Session> = { engine: v }
+                    // If the target engine doesn't support the current language,
+                    // switch to its first language (e.g. T-one → Russian).
+                    if (
+                      info &&
+                      info.languages.length > 0 &&
+                      !info.languages.some((l) => l.code === session.language)
+                    ) {
+                      patch.language = info.languages[0].code
+                    }
+                    const updated = await window.api.invoke('sessions:update', sessionId, patch)
+                    setSession(updated)
+                  }}
+                  data={engines.map((e) => ({ value: e.id, label: e.name }))}
+                />
+              )}
+              {selectableModels.length > 0 && (
+                <Select
+                  label="Model"
+                  size="sm"
+                  value={selectedModel?.id ?? null}
+                  onChange={async (v) => {
+                    if (!v) return
+                    const updated = await window.api.invoke('sessions:update', sessionId, {
+                      model: v
+                    })
+                    setSession(updated)
+                  }}
+                  data={selectableModels.map((m) => ({ value: m.id, label: m.name }))}
+                />
+              )}
               <Select
                 label="Language"
                 size="sm"
@@ -574,17 +645,27 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
                   })
                   setSession(updated)
                 }}
-                data={[
-                  { value: 'auto', label: 'auto-detect' },
-                  { value: 'ru', label: 'Russian' },
-                  { value: 'en', label: 'English' },
-                  { value: 'de', label: 'German' },
-                  { value: 'fr', label: 'French' },
-                  { value: 'es', label: 'Spanish' }
-                ]}
+                data={
+                  engineLangs.length > 0
+                    ? engineLangs.map((l) => ({ value: l.code, label: l.name }))
+                    : [
+                        { value: 'auto', label: 'auto-detect' },
+                        { value: 'ru', label: 'Russian' },
+                        { value: 'en', label: 'English' },
+                        { value: 'de', label: 'German' },
+                        { value: 'fr', label: 'French' },
+                        { value: 'es', label: 'Spanish' }
+                      ]
+                }
               />
             </div>
-          )}
+            {notReady && readyHint && (
+              <p className="text-xs text-amber-600 text-center max-w-xs">{readyHint}</p>
+            )}
+            {!notReady && costHint && (
+              <p className="text-xs text-[#8f7982] text-center">Estimated cost: {costHint}</p>
+            )}
+          </div>
           {session.audioSources.length > 1 ? (
             <div className="flex flex-col items-center gap-3">
               <div className="w-full max-w-xs flex flex-col gap-1.5">
@@ -597,20 +678,12 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
                   </div>
                 ))}
               </div>
-              <Button
-                color="sunset"
-                disabled={downloadedModels.length === 0}
-                onClick={handleTranscribeAll}
-              >
+              <Button color="sunset" disabled={notReady} onClick={handleTranscribeAll}>
                 Transcribe All Sources
               </Button>
             </div>
           ) : (
-            <Button
-              color="sunset"
-              disabled={downloadedModels.length === 0}
-              onClick={handleTranscribe}
-            >
+            <Button color="sunset" disabled={notReady} onClick={handleTranscribe}>
               Transcribe
             </Button>
           )}

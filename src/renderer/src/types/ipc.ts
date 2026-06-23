@@ -1,5 +1,10 @@
 // Shared IPC type definitions — used by preload and renderer.
 
+import type { EngineInfo, EngineModelInfo } from './engines'
+export type { EngineInfo, EngineModelInfo }
+
+export type TranscriptionEngine = 'whisper' | 'openai' | 'cohere' | 't-one'
+
 export type WhisperModel = 'tiny' | 'base' | 'small' | 'medium' | 'large'
 
 export interface AudioSource {
@@ -14,7 +19,8 @@ export interface Session {
   id: string
   name?: string
   createdAt: string
-  model: WhisperModel
+  engine: string
+  model: string
   language: string
   status: 'idle' | 'transcribing' | 'done'
   segments: Segment[]
@@ -22,7 +28,6 @@ export interface Session {
   convertedAudioPath?: string
   audioConvertedCBR?: boolean
   recordingSource?: 'recorded'
-  // v1 legacy — only for migration
   audioFile?: string
 }
 
@@ -41,13 +46,15 @@ export interface Speaker {
 }
 
 export interface Settings {
-  defaultModel: WhisperModel
+  defaultEngine: TranscriptionEngine
+  defaultModel: string
   defaultLanguage: string
   storagePath: string
+  openaiApiKey?: string
 }
 
 export interface ModelInfo {
-  model: WhisperModel
+  model: string
   sizeBytes: number
   downloaded: boolean
 }
@@ -68,7 +75,7 @@ export interface IpcInvokeMap {
   'sessions:list': { args: []; return: Session[] }
   'sessions:get': { args: [id: string]; return: Session | null }
   'sessions:create': {
-    args: [audioFile: string, model: WhisperModel, language: string]
+    args: [audioFile: string, model: string, language: string, engine?: string]
     return: Session
   }
   'sessions:update': { args: [id: string, data: Partial<Session>]; return: Session }
@@ -84,11 +91,22 @@ export interface IpcInvokeMap {
   'settings:get': { args: []; return: Settings }
   'settings:update': { args: [data: Partial<Settings>]; return: Settings }
 
+  // Engines
+  'engines:list': { args: []; return: EngineInfo[] }
+  'engines:models': { args: [engineId: string]; return: EngineModelInfo[] }
+  'engines:download-model': { args: [engineId: string, modelId: string]; return: void }
+  'engines:cancel-download': { args: [engineId: string, modelId: string]; return: void }
+  'engines:delete-model': { args: [engineId: string, modelId: string]; return: void }
+  'engines:validate-key': {
+    args: [engineId: string, key: string]
+    return: { ok: boolean; message?: string }
+  }
+
   // Models
   'models:list': { args: []; return: ModelInfo[] }
-  'models:download': { args: [model: WhisperModel]; return: void }
-  'models:cancel-download': { args: [model: WhisperModel]; return: void }
-  'models:delete': { args: [model: WhisperModel]; return: void }
+  'models:download': { args: [model: string]; return: void }
+  'models:cancel-download': { args: [model: string]; return: void }
+  'models:delete': { args: [model: string]; return: void }
 
   // Whisper transcription
   'whisper:transcribe': { args: [sessionId: string]; return: void }
@@ -126,9 +144,17 @@ export interface IpcEventMap {
   'whisper:progress': { sessionId: string; percent: number; eta: number | null }
   'whisper:done': { sessionId: string }
   'whisper:error': { sessionId: string; message: string }
-  'models:download-progress': { model: WhisperModel; percent: number; bytesPerSec: number }
-  'models:download-done': { model: WhisperModel }
-  'models:download-error': { model: WhisperModel; message: string }
+  'models:download-progress': { model: string; percent: number; bytesPerSec: number }
+  'models:download-done': { model: string }
+  'models:download-error': { model: string; message: string }
+  'engines:download-progress': {
+    engineId: string
+    modelId: string
+    percent: number
+    bytesPerSec: number
+  }
+  'engines:download-done': { engineId: string; modelId: string }
+  'engines:download-error': { engineId: string; modelId: string; message: string }
   'audio:convert-progress': { sessionId: string; percent: number }
   'audio:convert-done': { sessionId: string; convertedAudioPath: string }
   'audio:convert-error': { sessionId: string; message: string }
