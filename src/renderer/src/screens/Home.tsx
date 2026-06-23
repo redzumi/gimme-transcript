@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Text, Button, Group, ActionIcon, TextInput, ScrollArea } from '@mantine/core'
 import type { Session, Speaker } from '../types/ipc'
 import { Logo } from '../components/Logo'
+import logoSvg from '../assets/logo.svg'
 
 interface ContextMenu {
   sessionId: string
@@ -24,22 +24,15 @@ function formatAgo(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`
 }
 
-const STATUS_DOT: Record<string, string> = {
-  idle: 'bg-gray-300',
-  transcribing: 'bg-[#ffb33d]',
-  done: 'bg-emerald-400',
-  labeled: 'bg-[#a05dff]'
-}
-
-const STATUS_LABEL: Record<string, string> = {
-  idle: 'idle',
-  transcribing: 'transcribing…',
-  done: 'done',
-  labeled: 'labeled'
-}
-
 function getSessionName(s: Session): string {
   return s.name ?? s.audioSources[0]?.path.split('/').pop() ?? 'Session'
+}
+
+const STATUS_COLOR: Record<string, string> = {
+  idle: '#c0a8b5',
+  transcribing: '#ff8c3d',
+  done: '#34c474',
+  labeled: '#a05dff'
 }
 
 export default function Home({ onOpenSession, onOpenSettings }: Props): React.JSX.Element {
@@ -65,8 +58,6 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
     ])
     setSessions(s)
     setSpeakers(sp)
-    // Engine + model are chosen per-session on the Session screen; here we only
-    // carry the defaults for newly created sessions.
     setCurrentModel(settings.defaultModel)
     setCurrentEngine(settings.defaultEngine)
   }, [])
@@ -224,98 +215,100 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
 
   return (
     <div
-      className="flex h-screen flex-col bg-[var(--app-shell)]"
+      className="flex h-screen flex-col"
+      style={{ background: 'var(--app-shell)' }}
       onClick={() => {
         closeContextMenu()
         setNewMenuOpen(false)
       }}
     >
+      {/* Context menu */}
       {contextMenu &&
         (() => {
           const session = sessions.find((s) => s.id === contextMenu.sessionId)
           if (!session) return null
           return (
             <div
-              className="fixed z-50 min-w-[140px] rounded-xl border border-[#edd8ce] bg-white/95 py-1 shadow-[0_18px_48px_rgba(77,42,66,0.14)] backdrop-blur-sm"
+              className="fixed z-50 min-w-[148px] rounded-xl border border-[#e8d4ca] bg-white/96 py-1.5 shadow-[0_20px_60px_rgba(60,20,40,0.18),0_4px_12px_rgba(60,20,40,0.08)] backdrop-blur-md"
               style={{ top: contextMenu.y, left: contextMenu.x }}
               onClick={(e) => e.stopPropagation()}
             >
               <button
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#5b4653] transition-colors hover:bg-[#fff4ee]"
+                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-[13px] text-[#3d2635] transition-colors hover:bg-[#fff4ee]"
                 onClick={(e) => handleStartRename(e, session)}
               >
-                <span className="text-base">✎</span> Rename
+                Rename
               </button>
-              <div className="my-1 border-t border-[#f3e5dd]" />
+              <div className="mx-2 my-1 border-t border-[#f3e5dd]" />
               <button
-                className="w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors flex items-center gap-2"
+                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-[13px] text-red-500 transition-colors hover:bg-red-50"
                 onClick={(e) => {
                   handleDeleteSession(e, contextMenu.sessionId)
                   closeContextMenu()
                 }}
               >
-                <span className="text-base">✕</span> Delete
+                Delete
               </button>
             </div>
           )
         })()}
 
-      <div className="flex h-12 shrink-0 items-center justify-between border-b border-[#ead7cf] bg-white/70 px-5 backdrop-blur-sm">
-        <div className="flex items-center">
-          <Logo size={28} />
-        </div>
-        <Group gap="xs">
-          <ActionIcon
-            variant="subtle"
-            size="sm"
-            color="lilac"
-            onClick={onOpenSettings}
-            title="Settings"
-          >
-            <span style={{ fontSize: 14 }}>⚙</span>
-          </ActionIcon>
-        </Group>
+      {/* Titlebar */}
+      <div
+        className="app-titlebar relative z-10 flex h-[44px] shrink-0 items-center justify-between border-b border-[#e8d4ca]/60 bg-white/80 backdrop-blur-xl"
+        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+      >
+        <div style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties} />
       </div>
 
-      <div className="flex min-h-0 flex-1 overflow-hidden px-4 pb-4 pt-4">
-        <div className="flex min-w-0 flex-1 flex-col border-r border-[#ead7cf] bg-white/72 backdrop-blur-sm">
-          <div className="flex items-center justify-between border-b border-[#f3e5dd] px-5 py-2.5">
-            <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.06em' }}>
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        {/* Sessions panel */}
+        <div className="flex min-w-0 flex-1 flex-col border-r border-[#e8d4ca]/50 bg-white/50 backdrop-blur-sm">
+          {/* Sessions header */}
+          <div className="flex items-center justify-between border-b border-[#f0e0d8]/70 px-4 py-2.5">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#a08a96]">
               Sessions
-            </Text>
+            </span>
             <div className="relative" onClick={(e) => e.stopPropagation()}>
-              <Button
-                size="xs"
-                variant="subtle"
-                color="sunset"
+              <button
+                className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-[12px] font-semibold text-[#ff5a3c] transition-colors hover:bg-[#fff0ea]"
                 onClick={() => setNewMenuOpen((o) => !o)}
               >
-                + New ▾
-              </Button>
+                + New
+                <svg width="8" height="5" viewBox="0 0 8 5" fill="none" className="mt-px">
+                  <path
+                    d="M1 1l3 3 3-3"
+                    stroke="currentColor"
+                    strokeWidth="1.3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
               {newMenuOpen && (
-                <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] rounded-xl border border-[#edd8ce] bg-white/95 py-1 shadow-[0_18px_48px_rgba(77,42,66,0.14)] backdrop-blur-sm">
+                <div className="absolute right-0 top-full z-50 mt-1 min-w-[168px] rounded-xl border border-[#e8d4ca] bg-white/96 py-1.5 shadow-[0_20px_60px_rgba(60,20,40,0.16),0_4px_12px_rgba(60,20,40,0.08)] backdrop-blur-md">
                   <button
-                    className="w-full px-3 py-2 text-left text-sm text-[#5b4653] transition-colors hover:bg-[#fff4ee]"
+                    className="w-full px-3.5 py-2 text-left text-[13px] text-[#3d2635] transition-colors hover:bg-[#fff4ee]"
                     onClick={handleNewSession}
                   >
-                    Import audio
+                    Import audio file
                   </button>
                   <button
-                    className="w-full px-3 py-2 text-left text-sm text-[#5b4653] transition-colors hover:bg-[#fff4ee]"
+                    className="w-full px-3.5 py-2 text-left text-[13px] text-[#3d2635] transition-colors hover:bg-[#fff4ee]"
                     onClick={handleImportText}
                   >
                     Import text
                   </button>
-                  <div className="my-1 border-t border-[#f3e5dd]" />
+                  <div className="mx-2 my-1 border-t border-[#f3e5dd]" />
                   <button
-                    className="w-full px-3 py-2 text-left text-sm text-[#5b4653] transition-colors hover:bg-[#fff4ee]"
+                    className="w-full px-3.5 py-2 text-left text-[13px] text-[#3d2635] transition-colors hover:bg-[#fff4ee]"
                     onClick={handleEmptySession}
                   >
                     Empty session
                   </button>
-                  <div className="my-1 border-t border-[#f3e5dd]" />
+                  <div className="mx-2 my-1 border-t border-[#f3e5dd]" />
                   <button
-                    className="w-full px-3 py-2 text-left text-sm text-[#5b4653] transition-colors hover:bg-[#fff4ee]"
+                    className="w-full px-3.5 py-2 text-left text-[13px] text-[#3d2635] transition-colors hover:bg-[#fff4ee]"
                     onClick={handleRecord}
                   >
                     Record conversation
@@ -325,164 +318,244 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
             </div>
           </div>
 
-          <div className="border-b border-[#f3e5dd] px-5 py-2">
-            <TextInput
-              size="xs"
-              placeholder="Search sessions…"
-              value={search}
-              onChange={(e) => setSearch(e.currentTarget.value)}
-              styles={{ input: { backgroundColor: '#fff8f3', borderColor: '#edd8ce' } }}
-            />
+          {/* Search */}
+          <div className="border-b border-[#f0e0d8]/70 px-3 py-2">
+            <div className="relative">
+              <svg
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#c0a8b5]"
+                width="12"
+                height="12"
+                viewBox="0 0 12 12"
+                fill="none"
+              >
+                <circle cx="5" cy="5" r="3.5" stroke="currentColor" strokeWidth="1.2" />
+                <path
+                  d="M8.5 8.5L10.5 10.5"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                />
+              </svg>
+              <input
+                className="w-full rounded-lg border border-[#edd8ce]/60 bg-[#fff8f3]/80 py-1.5 pl-7 pr-3 text-[12px] text-[#3d2635] placeholder:text-[#c0a8b5] outline-none transition-colors focus:border-[#ffb7a1] focus:bg-white"
+                placeholder="Search sessions…"
+                value={search}
+                onChange={(e) => setSearch(e.currentTarget.value)}
+              />
+            </div>
           </div>
 
-          <ScrollArea className="flex-1">
+          {/* Session list */}
+          <div className="flex-1 overflow-y-auto">
             {filteredSessions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-40 gap-1">
+              <div className="flex flex-col items-center justify-center gap-3 px-8 py-12">
                 {sessions.length === 0 ? (
                   <>
-                    <Text size="sm" c="dimmed">
-                      No sessions yet
-                    </Text>
-                    <Text size="xs" c="dimmed">
-                      Click "+ New" to import an audio file
-                    </Text>
+                    <Logo size={52} className="opacity-90" />
+                    <div className="mt-1 text-center">
+                      <p className="text-[14px] font-semibold text-[#2e1f28]">Gimme Transcript</p>
+                      <p className="mt-0.5 text-[12px] text-[#a08a96]">
+                        Local offline transcription
+                      </p>
+                    </div>
+                    <div className="mt-3 h-px w-12 bg-[#f0e0d8]" />
+                    <p className="text-center text-[12px] text-[#b09aa6]">
+                      Click <span className="font-semibold text-[#ff5a3c]">+ New</span> to import
+                      audio or start recording
+                    </p>
                   </>
                 ) : (
-                  <Text size="sm" c="dimmed">
-                    No sessions match your search
-                  </Text>
+                  <p className="text-[13px] text-[#a08a96]">No sessions match your search</p>
                 )}
               </div>
             ) : (
-              <div>
-                {filteredSessions.map((s) => {
-                  const isLabeled =
-                    s.status === 'done' &&
-                    s.segments.length > 0 &&
-                    s.segments.every((seg) => seg.speakerId !== null)
-                  const key = isLabeled ? 'labeled' : s.status
-                  const isRenaming = renamingId === s.id
+              filteredSessions.map((s) => {
+                const isLabeled =
+                  s.status === 'done' &&
+                  s.segments.length > 0 &&
+                  s.segments.every((seg) => seg.speakerId !== null)
+                const statusKey = isLabeled ? 'labeled' : s.status
+                const isRenaming = renamingId === s.id
+                const prog = sessionProgress.get(s.id)
 
-                  return (
+                const statusLabel: string =
+                  statusKey === 'transcribing'
+                    ? prog !== undefined
+                      ? `${Math.round(prog)}%`
+                      : 'transcribing…'
+                    : statusKey === 'done'
+                      ? s.segments.length > 0
+                        ? `${s.segments.length} segments`
+                        : 'done'
+                      : statusKey === 'labeled'
+                        ? 'labeled'
+                        : 'idle'
+
+                return (
+                  <div
+                    key={s.id}
+                    className="group flex cursor-pointer items-center gap-3 border-b border-[#f5e4de]/50 px-4 py-3 transition-colors hover:bg-white/55"
+                    onClick={() => !isRenaming && onOpenSession(s.id)}
+                    onContextMenu={(e) => handleContextMenu(e, s.id)}
+                  >
                     <div
-                      key={s.id}
-                      className="group flex cursor-pointer items-center gap-3 border-b border-[#f6ebe5] px-5 py-3 transition-colors hover:bg-[#fff6f0]"
-                      onClick={() => !isRenaming && onOpenSession(s.id)}
-                      onContextMenu={(e) => handleContextMenu(e, s.id)}
-                    >
-                      <div className="flex-1 min-w-0">
-                        {isRenaming ? (
-                          <input
-                            ref={renameInputRef}
-                            className="w-full rounded border border-[#ffb7a1] px-1 text-sm font-medium text-[#24191f] outline-none"
-                            value={renameValue}
-                            onChange={(e) => setRenameValue(e.currentTarget.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleRenameSubmit(s.id)
-                              if (e.key === 'Escape') setRenamingId(null)
-                            }}
-                            onBlur={() => handleRenameSubmit(s.id)}
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        ) : (
-                          <p className="m-0 truncate text-sm font-medium text-[#24191f]">
-                            {getSessionName(s)}
-                          </p>
-                        )}
-                        <p className="m-0 mt-0.5 flex items-center gap-1.5">
-                          <span
-                            className={`inline-block w-1.5 h-1.5 rounded-full ${STATUS_DOT[key]}`}
-                          />
-                          <span className="text-xs text-[#7f6671]">{STATUS_LABEL[key]}</span>
-                          {key === 'transcribing' && sessionProgress.has(s.id) && (
-                            <span className="text-xs font-medium text-[#ff8a3d]">
-                              {Math.round(sessionProgress.get(s.id) ?? 0)}%
-                            </span>
-                          )}
-                          <span className="text-xs text-[#ccb8c1]">·</span>
-                          <span className="text-xs text-[#8f7982]">{formatAgo(s.createdAt)}</span>
+                      className="mt-px h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: STATUS_COLOR[statusKey] ?? '#c0a8b5' }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      {isRenaming ? (
+                        <input
+                          ref={renameInputRef}
+                          className="w-full rounded border border-[#ffb7a1] px-1 text-[14px] font-medium text-[#1c1117] outline-none"
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.currentTarget.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleRenameSubmit(s.id)
+                            if (e.key === 'Escape') setRenamingId(null)
+                          }}
+                          onBlur={() => handleRenameSubmit(s.id)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : (
+                        <p className="m-0 truncate text-[14px] font-medium leading-snug text-[#1c1117]">
+                          {getSessionName(s)}
                         </p>
-                      </div>
-
-                      <span className="shrink-0 text-sm text-[#ccb8c1]">›</span>
+                      )}
+                      <p className="m-0 mt-0.5 text-[11px] text-[#a08a96]">
+                        {statusLabel}
+                        <span className="mx-1 text-[#d4c0cb]">·</span>
+                        {formatAgo(s.createdAt)}
+                      </p>
                     </div>
-                  )
-                })}
-              </div>
+                    <svg
+                      className="shrink-0 text-[#d4c0cb] transition-colors group-hover:text-[#b09aa6]"
+                      width="5"
+                      height="9"
+                      viewBox="0 0 5 9"
+                      fill="none"
+                    >
+                      <path
+                        d="M1 1l3 3.5L1 8"
+                        stroke="currentColor"
+                        strokeWidth="1.3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
+                )
+              })
             )}
-          </ScrollArea>
+          </div>
         </div>
 
-        <div className="flex w-52 shrink-0 flex-col bg-[#fffdfb]/78 backdrop-blur-sm">
-          <div className="flex items-center justify-between border-b border-[#f3e5dd] px-4 py-2.5">
-            <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.06em' }}>
+        {/* Speakers panel */}
+        <div className="flex w-56 shrink-0 flex-col bg-white/30 backdrop-blur-sm">
+          {/* Brand block */}
+          <div className="flex flex-col items-center gap-2 border-b border-[#f0e0d8]/70 px-3 py-7">
+            <img
+              src={logoSvg}
+              alt="Gimme Transcript"
+              className="w-full object-contain"
+              style={{ maxHeight: 64 }}
+            />
+            <p className="text-[12px] font-bold tracking-tight text-[#2e1f28]">Gimme Transcript</p>
+          </div>
+          <div className="flex items-center justify-between border-b border-[#f0e0d8]/70 px-4 py-2.5">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#a08a96]">
               Speakers
-            </Text>
-            <Button
-              size="xs"
-              variant="subtle"
-              color="sunset"
+            </span>
+            <button
+              className="text-[12px] font-semibold text-[#ff5a3c] transition-colors hover:text-[#ff3d1a]"
               onClick={() => setAddingSpeaker(true)}
             >
               + Add
-            </Button>
+            </button>
           </div>
 
-          <ScrollArea className="flex-1 px-3 py-2">
-            {addingSpeaker && (
-              <div className="mb-2 rounded-xl border border-[#edd8ce] bg-[#fff8f3] p-2">
-                <TextInput
-                  size="xs"
-                  placeholder="Speaker name"
-                  value={newSpeakerName}
-                  onChange={(e) => setNewSpeakerName(e.currentTarget.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleAddSpeaker()
-                    if (e.key === 'Escape') setAddingSpeaker(false)
-                  }}
-                  autoFocus
-                />
-                <Group gap="xs" mt="xs">
-                  <Button size="xs" flex={1} color="sunset" onClick={handleAddSpeaker}>
-                    Add
-                  </Button>
-                  <Button
-                    size="xs"
-                    flex={1}
-                    variant="subtle"
-                    color="lilac"
-                    onClick={() => setAddingSpeaker(false)}
-                  >
-                    Cancel
-                  </Button>
-                </Group>
-              </div>
-            )}
-            {speakers.length === 0 && !addingSpeaker ? (
-              <Text c="dimmed" size="xs" ta="center" mt="lg">
-                No speakers yet
-              </Text>
-            ) : (
-              <div>
-                {speakers.map((sp) => (
-                  <div
-                    key={sp.id}
-                    className="group flex items-center justify-between rounded-md px-2 py-1.5 transition-colors hover:bg-[#fff4ee]"
-                  >
-                    <Text size="sm" c="gray.8">
-                      {sp.name}
-                    </Text>
+          <div className="flex flex-col flex-1 overflow-hidden">
+            <div className="flex-1 overflow-y-auto px-3 py-3">
+              {addingSpeaker && (
+                <div className="mb-3 rounded-xl border border-[#edd8ce] bg-white/80 p-2.5">
+                  <input
+                    className="w-full rounded-lg border border-[#edd8ce]/60 bg-[#fff8f3] px-2.5 py-1.5 text-[12px] text-[#3d2635] placeholder:text-[#c0a8b5] outline-none transition-colors focus:border-[#ffb7a1]"
+                    placeholder="Speaker name"
+                    value={newSpeakerName}
+                    onChange={(e) => setNewSpeakerName(e.currentTarget.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleAddSpeaker()
+                      if (e.key === 'Escape') setAddingSpeaker(false)
+                    }}
+                    autoFocus
+                  />
+                  <div className="mt-2 flex gap-1.5">
                     <button
-                      className="text-xs text-gray-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
-                      onClick={() => handleDeleteSpeaker(sp.id)}
+                      className="flex-1 rounded-lg bg-[#ff5a3c] py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-[#ff3d1a]"
+                      onClick={handleAddSpeaker}
                     >
-                      ✕
+                      Add
+                    </button>
+                    <button
+                      className="flex-1 rounded-lg border border-[#edd8ce] py-1.5 text-[11px] font-medium text-[#7a6671] transition-colors hover:bg-[#fff0ea]"
+                      onClick={() => setAddingSpeaker(false)}
+                    >
+                      Cancel
                     </button>
                   </div>
-                ))}
-              </div>
-            )}
-          </ScrollArea>
+                </div>
+              )}
+              {speakers.length === 0 && !addingSpeaker ? (
+                <p className="mt-6 text-center text-[11px] text-[#c0a8b5]">No speakers yet</p>
+              ) : (
+                <div className="flex flex-col gap-0.5">
+                  {speakers.map((sp) => (
+                    <div
+                      key={sp.id}
+                      className="group flex items-center justify-between rounded-lg px-2 py-1.5 transition-colors hover:bg-white/60"
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
+                        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#ffb090] to-[#ff5a3c]">
+                          <span className="text-[9px] font-bold uppercase text-white">
+                            {sp.name.charAt(0)}
+                          </span>
+                        </div>
+                        <span className="truncate text-[12px] font-medium text-[#3d2635]">
+                          {sp.name}
+                        </span>
+                      </div>
+                      <button
+                        className="text-[10px] text-[#d4c0cb] opacity-0 transition-all hover:text-red-400 group-hover:opacity-100"
+                        onClick={() => handleDeleteSpeaker(sp.id)}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* Settings button */}
+            <div className="shrink-0 border-t border-[#f0e0d8]/70 p-3">
+              <button
+                className="flex w-full items-center gap-2.5 rounded-xl bg-gradient-to-r from-[#fff0ea] to-[#fde8f8] px-3 py-2.5 text-left transition-all hover:from-[#ffe4d9] hover:to-[#f9d8f4] hover:shadow-[0_2px_8px_rgba(255,90,60,0.12)]"
+                onClick={onOpenSettings}
+              >
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 18 18"
+                  fill="none"
+                  className="text-[#ff5a3c]"
+                >
+                  <path
+                    d="M9 1a1 1 0 0 1 1 1v.64a5.5 5.5 0 0 1 1.59.66l.45-.45a1 1 0 1 1 1.41 1.41l-.45.45A5.5 5.5 0 0 1 13.66 6H14.3a1 1 0 0 1 0 2h-.64a5.5 5.5 0 0 1-.66 1.59l.45.45a1 1 0 1 1-1.41 1.41l-.45-.45A5.5 5.5 0 0 1 10 11.64V12.3a1 1 0 0 1-2 0v-.64a5.5 5.5 0 0 1-1.59-.66l-.45.45a1 1 0 0 1-1.41-1.41l.45-.45A5.5 5.5 0 0 1 4.34 8H3.7a1 1 0 0 1 0-2h.64a5.5 5.5 0 0 1 .66-1.59l-.45-.45a1 1 0 1 1 1.41-1.41l.45.45A5.5 5.5 0 0 1 8 2.64V2a1 1 0 0 1 1-1zm0 5a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"
+                    fill="currentColor"
+                  />
+                </svg>
+                <span className="text-[13px] font-semibold text-[#c03a20]">Settings</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

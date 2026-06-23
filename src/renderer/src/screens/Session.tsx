@@ -524,20 +524,39 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
         </Modal>
       )}
 
-      <div className="relative z-[60] flex h-12 shrink-0 items-center gap-2 border-b border-[#ead7cf] bg-white/70 px-4 backdrop-blur-sm">
+      <div
+        className="app-titlebar relative z-[60] flex h-[44px] shrink-0 items-center gap-2 border-b border-[#e8d4ca]/60 bg-white/80 px-3 backdrop-blur-xl"
+        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+      >
         <button
-          className="rounded px-1.5 py-1 text-xs text-[#8f7982] transition-colors hover:bg-[#fff2eb] hover:text-[#24191f]"
+          className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[12px] font-medium text-[#9e8899] transition-colors hover:bg-[#fff0ea] hover:text-[#3d2635]"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           onClick={onBack}
         >
-          ← Home
+          <svg width="5" height="9" viewBox="0 0 5 9" fill="none">
+            <path
+              d="M4 1L1 4.5L4 8"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          Home
         </button>
-        <div className="w-px h-3.5 bg-gray-200" />
-        <span className="flex-1 truncate text-sm font-medium text-[#5b4653]">{sessionName}</span>
+        <div className="h-3.5 w-px bg-[#e8d4ca]" />
+        <span
+          className="flex-1 truncate text-[13px] font-semibold text-[#1c1117]"
+          style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+        >
+          {sessionName}
+        </span>
         {session.recordingSource === 'recorded' && (
           <Button
             size="xs"
             variant="light"
             color="sunset"
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
             onClick={(e) => {
               e.stopPropagation()
               setFilesOpen(true)
@@ -547,7 +566,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
           </Button>
         )}
         {session.status === 'done' && (
-          <Group gap="xs">
+          <Group gap="xs" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
             <CopyButton session={session} speakers={speakers} />
             <ExportButton session={session} speakers={speakers} />
             <Button
@@ -566,13 +585,14 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
       </div>
 
       {session.status === 'transcribing' && (
-        <div className="shrink-0 border-b border-[#f3e5dd] bg-white/70 px-4 py-2">
-          <div className="flex items-center justify-between mb-1.5">
-            <Text size="xs" c="dimmed">
-              Transcribing… {Math.round(progress)}%
-            </Text>
+        <div className="shrink-0 border-b border-[#f3e5dd]/60 bg-white/50 px-5 py-2.5 backdrop-blur-sm">
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="text-[12px] text-[#7a6671]">
+              Transcribing…{' '}
+              <span className="font-semibold text-[#ff5a3c]">{Math.round(progress)}%</span>
+            </span>
             <button
-              className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+              className="text-[11px] text-[#c0a8b5] transition-colors hover:text-red-500"
               onClick={async () => {
                 await window.api.invoke('whisper:cancel', sessionId)
                 reload()
@@ -581,113 +601,134 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
               Cancel
             </button>
           </div>
-          <Progress value={progress} animated size="xs" color="sunset" />
+          <Progress value={progress} animated size="xs" color="sunset" radius="xl" />
         </div>
       )}
 
       {session.status === 'idle' && (
-        <div className="flex flex-col items-center justify-center flex-1 gap-8">
-          <div className="text-center">
-            <p className="mb-2 text-xs font-medium uppercase tracking-widest text-[#8f7982]">
-              Ready to transcribe
-            </p>
-            <p className="text-base font-semibold text-[#24191f]">{sessionName}</p>
-          </div>
-          <div className="flex flex-col items-center gap-3">
-            <div className="flex gap-4 items-end">
-              {engines.length > 1 && (
+        <div className="flex flex-1 flex-col items-center justify-center px-4">
+          <div className="w-full max-w-sm rounded-2xl border border-[#e8d4ca]/60 bg-white/80 p-8 shadow-[0_2px_32px_rgba(60,20,40,0.07)] backdrop-blur-md">
+            <div className="mb-6 text-center">
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#c0a8b5]">
+                Ready to transcribe
+              </p>
+              <p className="text-[16px] font-semibold leading-snug text-[#1c1117]">{sessionName}</p>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap gap-3">
+                {engines.length > 1 && (
+                  <Select
+                    label="Engine"
+                    size="sm"
+                    flex={1}
+                    value={currentEngine}
+                    onChange={async (v) => {
+                      if (!v) return
+                      const info = engines.find((e) => e.id === v)
+                      const patch: Partial<Session> = { engine: v }
+                      if (
+                        info &&
+                        info.languages.length > 0 &&
+                        !info.languages.some((l) => l.code === session.language)
+                      ) {
+                        patch.language = info.languages[0].code
+                      }
+                      const updated = await window.api.invoke('sessions:update', sessionId, patch)
+                      setSession(updated)
+                    }}
+                    data={engines.map((e) => ({ value: e.id, label: e.name }))}
+                  />
+                )}
+                {selectableModels.length > 0 && (
+                  <Select
+                    label="Model"
+                    size="sm"
+                    flex={1}
+                    value={selectedModel?.id ?? null}
+                    onChange={async (v) => {
+                      if (!v) return
+                      const updated = await window.api.invoke('sessions:update', sessionId, {
+                        model: v
+                      })
+                      setSession(updated)
+                    }}
+                    data={selectableModels.map((m) => ({ value: m.id, label: m.name }))}
+                  />
+                )}
                 <Select
-                  label="Engine"
+                  label="Language"
                   size="sm"
-                  value={currentEngine}
-                  onChange={async (v) => {
-                    if (!v) return
-                    const info = engines.find((e) => e.id === v)
-                    const patch: Partial<Session> = { engine: v }
-                    // If the target engine doesn't support the current language,
-                    // switch to its first language (e.g. T-one → Russian).
-                    if (
-                      info &&
-                      info.languages.length > 0 &&
-                      !info.languages.some((l) => l.code === session.language)
-                    ) {
-                      patch.language = info.languages[0].code
-                    }
-                    const updated = await window.api.invoke('sessions:update', sessionId, patch)
-                    setSession(updated)
-                  }}
-                  data={engines.map((e) => ({ value: e.id, label: e.name }))}
-                />
-              )}
-              {selectableModels.length > 0 && (
-                <Select
-                  label="Model"
-                  size="sm"
-                  value={selectedModel?.id ?? null}
+                  flex={1}
+                  value={session.language}
                   onChange={async (v) => {
                     if (!v) return
                     const updated = await window.api.invoke('sessions:update', sessionId, {
-                      model: v
+                      language: v
                     })
                     setSession(updated)
                   }}
-                  data={selectableModels.map((m) => ({ value: m.id, label: m.name }))}
+                  data={
+                    engineLangs.length > 0
+                      ? engineLangs.map((l) => ({ value: l.code, label: l.name }))
+                      : [
+                          { value: 'auto', label: 'auto-detect' },
+                          { value: 'ru', label: 'Russian' },
+                          { value: 'en', label: 'English' },
+                          { value: 'de', label: 'German' },
+                          { value: 'fr', label: 'French' },
+                          { value: 'es', label: 'Spanish' }
+                        ]
+                  }
                 />
-              )}
-              <Select
-                label="Language"
-                size="sm"
-                value={session.language}
-                onChange={async (v) => {
-                  if (!v) return
-                  const updated = await window.api.invoke('sessions:update', sessionId, {
-                    language: v
-                  })
-                  setSession(updated)
-                }}
-                data={
-                  engineLangs.length > 0
-                    ? engineLangs.map((l) => ({ value: l.code, label: l.name }))
-                    : [
-                        { value: 'auto', label: 'auto-detect' },
-                        { value: 'ru', label: 'Russian' },
-                        { value: 'en', label: 'English' },
-                        { value: 'de', label: 'German' },
-                        { value: 'fr', label: 'French' },
-                        { value: 'es', label: 'Spanish' }
-                      ]
-                }
-              />
-            </div>
-            {notReady && readyHint && (
-              <p className="text-xs text-amber-600 text-center max-w-xs">{readyHint}</p>
-            )}
-            {!notReady && costHint && (
-              <p className="text-xs text-[#8f7982] text-center">Estimated cost: {costHint}</p>
-            )}
-          </div>
-          {session.audioSources.length > 1 ? (
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-full max-w-xs flex flex-col gap-1.5">
-                {session.audioSources.map((src) => (
-                  <div
-                    key={src.id}
-                    className="flex items-center justify-between rounded-lg border border-[#edd8ce] bg-white/70 px-3 py-2"
-                  >
-                    <span className="text-xs text-[#5b4653] truncate">{src.label}</span>
-                  </div>
-                ))}
               </div>
-              <Button color="sunset" disabled={notReady} onClick={handleTranscribeAll}>
-                Transcribe All Sources
-              </Button>
+
+              {notReady && readyHint && (
+                <p className="text-center text-[12px] text-amber-600">{readyHint}</p>
+              )}
+              {!notReady && costHint && (
+                <p className="text-center text-[12px] text-[#a08a96]">Estimated cost: {costHint}</p>
+              )}
+
+              {session.audioSources.length > 1 ? (
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-1">
+                    {session.audioSources.map((src) => (
+                      <div
+                        key={src.id}
+                        className="rounded-lg border border-[#edd8ce] bg-[#fff8f3]/70 px-3 py-2"
+                      >
+                        <span className="truncate text-[12px] text-[#5b4653]">{src.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <Button
+                    color="sunset"
+                    size="md"
+                    radius="xl"
+                    fullWidth
+                    disabled={notReady}
+                    onClick={handleTranscribeAll}
+                  >
+                    Transcribe All Sources
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  color="sunset"
+                  size="md"
+                  radius="xl"
+                  fullWidth
+                  disabled={notReady}
+                  onClick={handleTranscribe}
+                >
+                  Transcribe
+                </Button>
+              )}
+
+              {error && <p className="text-center text-[12px] text-red-500">{error}</p>}
             </div>
-          ) : (
-            <Button color="sunset" disabled={notReady} onClick={handleTranscribe}>
-              Transcribe
-            </Button>
-          )}
-          {error && <p className="text-xs text-red-500 text-center max-w-xs px-4">{error}</p>}
+          </div>
         </div>
       )}
 

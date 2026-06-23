@@ -37,6 +37,10 @@ const theme = createTheme({
   }
 })
 
+if (navigator.userAgent.includes('Mac')) {
+  document.documentElement.classList.add('is-mac')
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <MantineProvider defaultColorScheme="light" theme={theme}>

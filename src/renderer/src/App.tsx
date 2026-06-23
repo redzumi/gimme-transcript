@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { RecordingPermission, RecordingPermissions } from './types/ipc'
+import { Logo } from './components/Logo'
 import Permissions from './screens/Permissions'
 import FirstLaunch from './screens/FirstLaunch'
 import Home from './screens/Home'
@@ -57,12 +58,35 @@ export default function App(): React.JSX.Element {
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       void checkStartupState()
-    }, 0)
+    }, 1000)
 
     return () => window.clearTimeout(timeoutId)
   }, [])
 
-  if (!screen) return <div style={{ height: '100vh', background: 'var(--app-shell)' }} />
+  if (!screen)
+    return (
+      <div
+        className="flex h-screen flex-col items-center justify-center gap-6"
+        style={{ background: 'var(--app-shell)' }}
+      >
+        <div className="animate-[fadeIn_0.4s_ease-out]">
+          <Logo size={48} />
+        </div>
+        <div className="flex items-center gap-1.5">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="h-1.5 w-1.5 rounded-full bg-[#ffb090]"
+              style={{ animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite` }}
+            />
+          ))}
+        </div>
+        <style>{`
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0%, 100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1); } }
+      `}</style>
+      </div>
+    )
 
   if (screen.name === 'permissions') {
     return (
