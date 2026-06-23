@@ -535,7 +535,7 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
                           />
                           {colorPickerId === sp.id && (
                             <div
-                              className="absolute left-0 top-6 z-50 grid grid-cols-4 gap-1 rounded-xl border border-[#edd8ce] bg-white/96 p-2 shadow-[0_18px_48px_rgba(77,42,66,0.14)] backdrop-blur-sm"
+                              className="absolute left-0 top-6 z-50 grid grid-cols-4 gap-1.5 rounded-xl border border-[#edd8ce] bg-white/96 p-2.5 shadow-[0_18px_48px_rgba(77,42,66,0.14)] backdrop-blur-sm w-[120px]"
                               onClick={(e) => e.stopPropagation()}
                             >
                               {SPEAKER_PALETTE.map((c, i) => (
