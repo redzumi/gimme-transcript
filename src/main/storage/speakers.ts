@@ -10,7 +10,10 @@ function readAll(): Speaker[] {
     const raw = JSON.parse(readFileSync(p, 'utf8')) as Array<
       Omit<Speaker, 'color'> & { color?: number }
     >
-    return raw.map((sp, i) => ({ ...sp, color: sp.color ?? i % 16 }))
+    const needsMigration = raw.some((sp) => sp.color === undefined)
+    const migrated = raw.map((sp, i) => ({ ...sp, color: sp.color ?? i % 16 }))
+    if (needsMigration) writeAll(migrated)
+    return migrated
   } catch {
     return []
   }

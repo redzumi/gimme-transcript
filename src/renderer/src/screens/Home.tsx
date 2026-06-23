@@ -526,7 +526,11 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
                         <div className="relative shrink-0">
                           <button
                             className="h-5 w-5 rounded-full border border-white/60 shadow-sm transition-transform hover:scale-110 focus:outline-none"
-                            style={{ backgroundColor: SPEAKER_PALETTE[sp.color % 16].swatch }}
+                            style={{
+                              backgroundColor:
+                                SPEAKER_PALETTE[(Number.isFinite(sp.color) ? sp.color : 0) % 16]
+                                  .swatch
+                            }}
                             onClick={(e) => {
                               e.stopPropagation()
                               setColorPickerId((prev) => (prev === sp.id ? null : sp.id))
