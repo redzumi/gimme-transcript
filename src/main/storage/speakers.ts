@@ -7,7 +7,10 @@ function readAll(): Speaker[] {
   const p = getSpeakersPath()
   if (!existsSync(p)) return []
   try {
-    return JSON.parse(readFileSync(p, 'utf8')) as Speaker[]
+    const raw = JSON.parse(readFileSync(p, 'utf8')) as Array<
+      Omit<Speaker, 'color'> & { color?: number }
+    >
+    return raw.map((sp, i) => ({ ...sp, color: sp.color ?? i % 16 }))
   } catch {
     return []
   }
@@ -26,6 +29,7 @@ export function createSpeaker(name: string): Speaker {
   const speaker: Speaker = {
     id: randomUUID(),
     name,
+    color: speakers.length % 16,
     createdAt: new Date().toISOString()
   }
   speakers.push(speaker)
@@ -33,11 +37,15 @@ export function createSpeaker(name: string): Speaker {
   return speaker
 }
 
-export function updateSpeaker(id: string, name: string): Speaker {
+export function updateSpeaker(id: string, name: string, color?: number): Speaker {
   const speakers = readAll()
   const idx = speakers.findIndex((s) => s.id === id)
   if (idx === -1) throw new Error(`Speaker not found: ${id}`)
-  speakers[idx] = { ...speakers[idx], name }
+  speakers[idx] = {
+    ...speakers[idx],
+    name,
+    ...(color !== undefined ? { color } : {})
+  }
   writeAll(speakers)
   return speakers[idx]
 }
