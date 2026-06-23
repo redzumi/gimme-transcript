@@ -746,7 +746,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
               )}
             </div>
           ) : (
-            <div ref={segmentScrollRef} className="flex-1 overflow-y-auto">
+            <div ref={segmentScrollRef} className="flex-1 overflow-y-auto bg-white/75">
               <div
                 style={{
                   height: rowVirtualizer.getTotalSize() + 48,
