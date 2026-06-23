@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { Text, Button, Group, Progress, Select, Modal, Checkbox } from '@mantine/core'
 import type { Session, Segment, Speaker, EngineInfo, EngineModelInfo } from '../types/ipc'
+import { SPEAKER_PALETTE } from '../lib/speakerColors'
 
 interface Props {
   sessionId: string
@@ -17,17 +18,6 @@ function formatTime(seconds: number): string {
 function getFileName(filePath: string): string {
   return filePath.split(/[\\/]/).pop() ?? filePath
 }
-
-const SPEAKER_COLORS = [
-  { pill: 'bg-blue-100 text-blue-700', bar: 'bg-blue-50 border-l-2 border-blue-300' },
-  { pill: 'bg-emerald-100 text-emerald-700', bar: 'bg-emerald-50 border-l-2 border-emerald-300' },
-  { pill: 'bg-[#ffe3dc] text-[#d4375b]', bar: 'bg-[#fff5f1] border-l-2 border-[#ff7e77]' },
-  { pill: 'bg-violet-100 text-violet-700', bar: 'bg-violet-50 border-l-2 border-violet-300' },
-  { pill: 'bg-pink-100 text-pink-700', bar: 'bg-pink-50 border-l-2 border-pink-300' },
-  { pill: 'bg-amber-100 text-amber-700', bar: 'bg-amber-50 border-l-2 border-amber-300' },
-  { pill: 'bg-cyan-100 text-cyan-700', bar: 'bg-cyan-50 border-l-2 border-cyan-300' },
-  { pill: 'bg-rose-100 text-rose-700', bar: 'bg-rose-50 border-l-2 border-rose-300' }
-]
 
 const SUPPORTED_EXTS = new Set(['mp3', 'm4a', 'mp4', 'wav', 'ogg', 'flac', 'aac', 'opus', 'webm'])
 
@@ -155,12 +145,6 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
     window.addEventListener('mouseup', onMouseUp)
     return () => window.removeEventListener('mouseup', onMouseUp)
   }, [])
-
-  const speakerColorMap = useMemo(() => {
-    const map = new Map<string, number>()
-    speakers.forEach((sp, i) => map.set(sp.id, i))
-    return map
-  }, [speakers])
 
   const selectedIds = useMemo((): Set<string> => {
     if (!session || anchorIdx === null) return new Set()
@@ -423,8 +407,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
             </div>
             <div className="my-1 border-t border-[#f3e5dd]" />
             {speakers.map((sp) => {
-              const colorIdx = speakerColorMap.get(sp.id) ?? 0
-              const colors = SPEAKER_COLORS[colorIdx % SPEAKER_COLORS.length]
+              const colors = SPEAKER_PALETTE[sp.color % 16]
               return (
                 <button
                   key={sp.id}
@@ -774,9 +757,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
                   const seg = session.segments[vItem.index]
                   const idx = vItem.index
                   const speaker = speakers.find((s) => s.id === seg.speakerId)
-                  const colorIdx = speaker ? (speakerColorMap.get(speaker.id) ?? 0) : -1
-                  const colors =
-                    colorIdx >= 0 ? SPEAKER_COLORS[colorIdx % SPEAKER_COLORS.length] : null
+                  const colors = speaker ? SPEAKER_PALETTE[speaker.color % 16] : null
                   const isSelected = selectedIds.has(seg.id)
                   const isEditing = editingId === seg.id
 
