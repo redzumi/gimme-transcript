@@ -42,6 +42,7 @@ export interface Segment {
 export interface Speaker {
   id: string
   name: string
+  color: number
   createdAt: string
 }
 
@@ -84,7 +85,7 @@ export interface IpcInvokeMap {
   // Speakers
   'speakers:list': { args: []; return: Speaker[] }
   'speakers:create': { args: [name: string]; return: Speaker }
-  'speakers:update': { args: [id: string, name: string]; return: Speaker }
+  'speakers:update': { args: [id: string, name: string, color?: number]; return: Speaker }
   'speakers:delete': { args: [id: string]; return: void }
 
   // Settings
