@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Session, Speaker } from '../types/ipc'
 import { Logo } from '../components/Logo'
 import logoSvg from '../assets/logo.svg'
+import { SPEAKER_PALETTE } from '../lib/speakerColors'
 
 interface ContextMenu {
   sessionId: string
@@ -47,6 +48,7 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
   const [renameValue, setRenameValue] = useState('')
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null)
   const [newMenuOpen, setNewMenuOpen] = useState(false)
+  const [colorPickerId, setColorPickerId] = useState<string | null>(null)
   const [sessionProgress, setSessionProgress] = useState<Map<string, number>>(new Map())
   const renameInputRef = useRef<HTMLInputElement>(null)
 
@@ -209,6 +211,12 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
     await window.api.invoke('speakers:delete', id)
   }
 
+  async function handleSetColor(sp: Speaker, colorIdx: number): Promise<void> {
+    const updated = await window.api.invoke('speakers:update', sp.id, sp.name, colorIdx)
+    setSpeakers((prev) => prev.map((s) => (s.id === sp.id ? updated : s)))
+    setColorPickerId(null)
+  }
+
   const filteredSessions = search.trim()
     ? sessions.filter((s) => getSessionName(s).toLowerCase().includes(search.trim().toLowerCase()))
     : sessions
@@ -220,6 +228,7 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
       onClick={() => {
         closeContextMenu()
         setNewMenuOpen(false)
+        setColorPickerId(null)
       }}
     >
       {/* Context menu */}
@@ -514,10 +523,35 @@ export default function Home({ onOpenSession, onOpenSettings }: Props): React.JS
                       className="group flex items-center justify-between rounded-lg px-2 py-1.5 transition-colors hover:bg-white/60"
                     >
                       <div className="flex min-w-0 items-center gap-2">
-                        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#ffb090] to-[#ff5a3c]">
-                          <span className="text-[9px] font-bold uppercase text-white">
-                            {sp.name.charAt(0)}
-                          </span>
+                        <div className="relative shrink-0">
+                          <button
+                            className="h-5 w-5 rounded-full border border-white/60 shadow-sm transition-transform hover:scale-110 focus:outline-none"
+                            style={{ backgroundColor: SPEAKER_PALETTE[sp.color % 16].swatch }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setColorPickerId((prev) => (prev === sp.id ? null : sp.id))
+                            }}
+                            title="Change color"
+                          />
+                          {colorPickerId === sp.id && (
+                            <div
+                              className="absolute left-0 top-6 z-50 grid grid-cols-4 gap-1 rounded-xl border border-[#edd8ce] bg-white/96 p-2 shadow-[0_18px_48px_rgba(77,42,66,0.14)] backdrop-blur-sm"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {SPEAKER_PALETTE.map((c, i) => (
+                                <button
+                                  key={i}
+                                  className={`h-5 w-5 rounded-full border transition-transform hover:scale-110 focus:outline-none ${
+                                    sp.color % 16 === i
+                                      ? 'border-[#ff5a3c] ring-2 ring-[#ff5a3c] ring-offset-1'
+                                      : 'border-white/60'
+                                  }`}
+                                  style={{ backgroundColor: c.swatch }}
+                                  onClick={() => handleSetColor(sp, i)}
+                                />
+                              ))}
+                            </div>
+                          )}
                         </div>
                         <span className="truncate text-[12px] font-medium text-[#3d2635]">
                           {sp.name}
