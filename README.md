@@ -103,8 +103,11 @@ enter a proxy URL and click **Save proxy**. For example:
 
 - `http://127.0.0.1:8080`
 - `socks5://127.0.0.1:1080`
+- `http://user:password@proxy.example:8080`
 
-HTTP, HTTPS, SOCKS4 and SOCKS5 proxies without authentication are supported. The
+HTTP and HTTPS proxies support a username and password in the URL. Percent-encode
+special characters in credentials (for example, `@` as `%40`). SOCKS4 and SOCKS5
+proxies support connections without authentication. The
 setting is shared by external providers and applies to transcription and API key
 verification. Leave the URL empty and save to connect directly. Changes apply to
 new requests immediately; local engines and model downloads are unaffected.

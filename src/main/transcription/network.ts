@@ -2,17 +2,39 @@ import { randomUUID } from 'crypto'
 import { session, type Session } from 'electron'
 import { getSettings } from '../storage'
 import { normalizeProviderProxy } from './proxy-config'
+import { fetchWithProxyAuth, type ProxyCredentials } from './proxy-auth'
 
-let cached: { proxyUrl: string; ready: Promise<Session> } | undefined
+interface ProviderConnection {
+  session: Session
+  credentials?: ProxyCredentials
+}
 
-async function providerSession(proxyUrl: string): Promise<Session> {
+let cached: { proxyUrl: string; ready: Promise<ProviderConnection> } | undefined
+
+async function providerSession(proxyUrl: string): Promise<ProviderConnection> {
   // A separate in-memory session keeps provider traffic isolated from the UI.
   // Changing proxy creates a new connection pool without interrupting active jobs.
   const provider = session.fromPartition(`provider-network-${randomUUID()}`, { cache: false })
+  const parsed = proxyUrl ? new URL(proxyUrl) : undefined
+  const credentials =
+    parsed && (parsed.username || parsed.password)
+      ? {
+          host: parsed.hostname.replace(/^\[|\]$/g, ''),
+          port: Number(parsed.port || (parsed.protocol === 'https:' ? 443 : 80)),
+          username: decodeURIComponent(parsed.username),
+          password: decodeURIComponent(parsed.password)
+        }
+      : undefined
+  if (parsed) {
+    parsed.username = ''
+    parsed.password = ''
+  }
   await provider.setProxy(
-    proxyUrl ? { mode: 'fixed_servers', proxyRules: proxyUrl } : { mode: 'direct' }
+    parsed
+      ? { mode: 'fixed_servers', proxyRules: `${parsed.protocol}//${parsed.host}` }
+      : { mode: 'direct' }
   )
-  return provider
+  return { session: provider, credentials }
 }
 
 export async function providerFetch(url: string, init?: RequestInit): Promise<Response> {
@@ -28,5 +50,7 @@ export async function providerFetch(url: string, init?: RequestInit): Promise<Re
   }
   const provider = await cached.ready
   init?.signal?.throwIfAborted()
-  return provider.fetch(url, init)
+  return provider.credentials
+    ? fetchWithProxyAuth(provider.session, url, init, provider.credentials)
+    : provider.session.fetch(url, init)
 }

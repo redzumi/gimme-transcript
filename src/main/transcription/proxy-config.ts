@@ -21,9 +21,17 @@ export function normalizeProviderProxy(value: string): string {
     throw new Error('Proxy must use HTTP, HTTPS, SOCKS4 or SOCKS5 and include a host.')
   }
   if (url.username || url.password) {
-    throw new Error(
-      'Proxy authentication is not supported. Use a proxy without a username or password.'
-    )
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      throw new Error(
+        'SOCKS proxy authentication is not supported. Use an HTTP or HTTPS proxy with authentication.'
+      )
+    }
+    try {
+      decodeURIComponent(url.username)
+      decodeURIComponent(url.password)
+    } catch {
+      throw new Error('Proxy credentials contain invalid URL encoding.')
+    }
   }
   if ((url.pathname && url.pathname !== '/') || url.search || url.hash) {
     throw new Error('Proxy URL must contain only a scheme, host and optional port.')
@@ -32,5 +40,6 @@ export function normalizeProviderProxy(value: string): string {
   if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535) {
     throw new Error('Proxy port must be between 1 and 65535.')
   }
-  return `${url.protocol}//${url.hostname}:${port}`
+  const credentials = url.username || url.password ? `${url.username}:${url.password}@` : ''
+  return `${url.protocol}//${credentials}${url.hostname}:${port}`
 }

@@ -4,10 +4,12 @@ const mocks = vi.hoisted(() => ({
   proxy: '',
   fromPartition: vi.fn(),
   setProxy: vi.fn(),
-  fetch: vi.fn()
+  fetch: vi.fn(),
+  fetchAuth: vi.fn()
 }))
 vi.mock('electron', () => ({ session: { fromPartition: mocks.fromPartition } }))
 vi.mock('../storage', () => ({ getSettings: () => ({ providerProxyUrl: mocks.proxy }) }))
+vi.mock('./proxy-auth', () => ({ fetchWithProxyAuth: mocks.fetchAuth }))
 
 beforeEach(() => {
   vi.resetModules()
@@ -15,6 +17,7 @@ beforeEach(() => {
   mocks.proxy = ''
   mocks.setProxy.mockResolvedValue(undefined)
   mocks.fetch.mockResolvedValue(new Response('{}'))
+  mocks.fetchAuth.mockResolvedValue(new Response('{}'))
   mocks.fromPartition.mockImplementation(() => ({ setProxy: mocks.setProxy, fetch: mocks.fetch }))
 })
 
@@ -25,6 +28,37 @@ it('uses an isolated direct connection when the proxy is empty', async () => {
     cache: false
   })
   expect(mocks.setProxy).toHaveBeenCalledWith({ mode: 'direct' })
+})
+
+it('strips credentials from proxy rules and passes decoded credentials to the authenticated transport', async () => {
+  mocks.proxy = 'http://u%40ser:p%3Ass@localhost:8080'
+  const { providerFetch } = await import('./network')
+  await providerFetch('https://provider.example')
+  expect(mocks.setProxy).toHaveBeenCalledWith({
+    mode: 'fixed_servers',
+    proxyRules: 'http://localhost:8080'
+  })
+  expect(mocks.fetch).not.toHaveBeenCalled()
+  expect(mocks.fetchAuth).toHaveBeenCalledWith(
+    expect.anything(),
+    'https://provider.example',
+    undefined,
+    {
+      host: 'localhost',
+      port: 8080,
+      username: 'u@ser',
+      password: 'p:ss'
+    }
+  )
+})
+
+it('uses a separate session when credentials change on the same proxy', async () => {
+  const { providerFetch } = await import('./network')
+  mocks.proxy = 'http://user:first@localhost:8080'
+  await providerFetch('https://provider.example')
+  mocks.proxy = 'http://user:second@localhost:8080'
+  await providerFetch('https://provider.example')
+  expect(mocks.fromPartition).toHaveBeenCalledTimes(2)
 })
 
 it('shares proxy configuration across concurrent requests and forwards body and cancellation', async () => {

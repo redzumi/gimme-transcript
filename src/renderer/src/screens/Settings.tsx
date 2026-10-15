@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Button, Select, Group, PasswordInput, Progress, TextInput } from '@mantine/core'
+import { Button, Select, Group, PasswordInput, Progress } from '@mantine/core'
 import type { Settings, EngineInfo, EngineModelInfo } from '../types/ipc'
 
 interface Props {
@@ -362,9 +362,9 @@ export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
                       Shared by all external providers for transcription and API key verification.
                     </p>
                     <Group align="flex-start" gap="sm">
-                      <TextInput
+                      <PasswordInput
                         label="Proxy URL"
-                        description="HTTP, HTTPS or SOCKS4/5 without authentication. Leave empty for a direct connection."
+                        description="HTTP/HTTPS supports http://user:password@host:port. SOCKS4/5 supports connections without authentication. Leave empty for a direct connection."
                         placeholder="socks5://127.0.0.1:1080"
                         flex={1}
                         value={proxyDraft ?? ''}
