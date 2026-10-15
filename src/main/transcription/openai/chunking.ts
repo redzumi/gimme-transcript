@@ -2,12 +2,12 @@
 // and if still too large, split into time segments. Returns parts with their
 // offset (seconds) for timestamp correction, plus a cleanup() for temp files.
 
-import { spawn } from 'child_process'
 import { statSync, readdirSync, unlinkSync, mkdtempSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { randomUUID } from 'crypto'
 import { findFfmpeg } from '../../whisper/convert'
+import { spawnCancellable } from '../process'
 
 const MAX_BYTES = 24 * 1024 * 1024 // 24 MB safety margin under OpenAI's 25 MB
 const MP3_BITRATE_KBPS = 64
@@ -31,22 +31,31 @@ function ffmpeg(): string {
   return bin
 }
 
-function run(args: string[]): Promise<string> {
+function run(args: string[], signal?: AbortSignal): Promise<string> {
   return new Promise((resolve, reject) => {
-    const proc = spawn(ffmpeg(), args)
+    const proc = spawnCancellable(ffmpeg(), args, signal)
     let stderr = ''
     proc.stderr.on('data', (d: Buffer) => (stderr += d.toString()))
-    proc.on('close', (code) => (code === 0 ? resolve(stderr) : reject(new Error(`ffmpeg ${code}`))))
+    proc.on('close', (code) => {
+      if (signal?.aborted) reject(signal.reason)
+      else if (code === 0) resolve(stderr)
+      else reject(new Error(`ffmpeg ${code}`))
+    })
     proc.on('error', reject)
   })
 }
 
-export function getDurationSec(inputPath: string): Promise<number> {
-  return new Promise((resolve) => {
-    const proc = spawn(ffmpeg(), ['-i', inputPath])
+export async function getDurationSec(inputPath: string, signal?: AbortSignal): Promise<number> {
+  // ffmpeg exits with a non-zero code when probing without an output file.
+  return new Promise((resolve, reject) => {
+    const proc = spawnCancellable(ffmpeg(), ['-i', inputPath], signal)
     let stderr = ''
     proc.stderr.on('data', (d: Buffer) => (stderr += d.toString()))
     proc.on('close', () => {
+      if (signal?.aborted) {
+        reject(signal.reason)
+        return
+      }
       const m = stderr.match(/Duration:\s*(\d+):(\d+):(\d+\.\d+)/)
       resolve(m ? +m[1] * 3600 + +m[2] * 60 + parseFloat(m[3]) : 0)
     })
@@ -54,25 +63,33 @@ export function getDurationSec(inputPath: string): Promise<number> {
   })
 }
 
-async function compressToMp3(inputPath: string, outPath: string): Promise<void> {
-  await run([
-    '-y',
-    '-i',
-    inputPath,
-    '-vn',
-    '-ac',
-    '1',
-    '-ar',
-    '16000',
-    '-b:a',
-    `${MP3_BITRATE_KBPS}k`,
-    outPath
-  ])
+async function compressToMp3(
+  inputPath: string,
+  outPath: string,
+  signal?: AbortSignal
+): Promise<void> {
+  await run(
+    [
+      '-y',
+      '-i',
+      inputPath,
+      '-vn',
+      '-ac',
+      '1',
+      '-ar',
+      '16000',
+      '-b:a',
+      `${MP3_BITRATE_KBPS}k`,
+      outPath
+    ],
+    signal
+  )
 }
 
-export async function planAudioParts(inputPath: string): Promise<AudioPlan> {
-  const durationSec = await getDurationSec(inputPath)
+export async function planAudioParts(inputPath: string, signal?: AbortSignal): Promise<AudioPlan> {
+  const durationSec = await getDurationSec(inputPath, signal)
   const temps: string[] = []
+  let dir: string | undefined
   const cleanup = (): void => {
     for (const t of temps) {
       try {
@@ -81,6 +98,7 @@ export async function planAudioParts(inputPath: string): Promise<AudioPlan> {
         /* ignore */
       }
     }
+    if (dir) rmSync(dir, { recursive: true, force: true })
   }
 
   if (statSync(inputPath).size <= MAX_BYTES) {
@@ -89,43 +107,45 @@ export async function planAudioParts(inputPath: string): Promise<AudioPlan> {
 
   // Compress to a small mono MP3 first.
   const mp3 = join(tmpdir(), `openai-${randomUUID()}.mp3`)
-  await compressToMp3(inputPath, mp3)
   temps.push(mp3)
-  if (statSync(mp3).size <= MAX_BYTES) {
-    return { parts: [{ path: mp3, offsetSec: 0 }], durationSec, cleanup }
-  }
-
-  // Still too big: split into time segments.
-  const dir = mkdtempSync(join(tmpdir(), 'openai-parts-'))
-  await run([
-    '-y',
-    '-i',
-    mp3,
-    '-f',
-    'segment',
-    '-segment_time',
-    String(SEGMENT_SEC),
-    '-c',
-    'copy',
-    join(dir, 'part-%03d.mp3')
-  ])
-  const files = readdirSync(dir)
-    .filter((f) => f.endsWith('.mp3'))
-    .sort()
-  const parts: AudioPart[] = files.map((f, i) => ({
-    path: join(dir, f),
-    offsetSec: i * SEGMENT_SEC
-  }))
-  return {
-    parts,
-    durationSec,
-    cleanup: () => {
-      cleanup()
-      try {
-        rmSync(dir, { recursive: true, force: true })
-      } catch {
-        /* ignore */
-      }
+  try {
+    await compressToMp3(inputPath, mp3, signal)
+    if (statSync(mp3).size <= MAX_BYTES) {
+      return { parts: [{ path: mp3, offsetSec: 0 }], durationSec, cleanup }
     }
+
+    // Still too big: split into time segments.
+    const partsDir = mkdtempSync(join(tmpdir(), 'openai-parts-'))
+    dir = partsDir
+    await run(
+      [
+        '-y',
+        '-i',
+        mp3,
+        '-f',
+        'segment',
+        '-segment_time',
+        String(SEGMENT_SEC),
+        '-c',
+        'copy',
+        join(dir, 'part-%03d.mp3')
+      ],
+      signal
+    )
+    const files = readdirSync(dir)
+      .filter((f) => f.endsWith('.mp3'))
+      .sort()
+    const parts: AudioPart[] = files.map((f, i) => ({
+      path: join(partsDir, f),
+      offsetSec: i * SEGMENT_SEC
+    }))
+    return {
+      parts,
+      durationSec,
+      cleanup
+    }
+  } catch (err) {
+    cleanup()
+    throw err
   }
 }

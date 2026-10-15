@@ -27,6 +27,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
   const [engines, setEngines] = useState<EngineInfo[]>([])
   const [engineModels, setEngineModels] = useState<EngineModelInfo[]>([])
   const [progress, setProgress] = useState(0)
+  const [cancelling, setCancelling] = useState(false)
   const [anchorIdx, setAnchorIdx] = useState<number | null>(null)
   const [focusIdx, setFocusIdx] = useState<number | null>(null)
   const [mergeOpen, setMergeOpen] = useState(false)
@@ -46,7 +47,6 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
   const isDraggingRef = useRef(false)
   const didDragRef = useRef(false)
 
-  // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
     count: session?.segments.length ?? 0,
     getScrollElement: () => segmentScrollRef.current,
@@ -313,19 +313,40 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
   }, [session, engines, engineModels, sessionId])
 
   async function handleTranscribe(): Promise<void> {
-    setError(null)
-    setSession((prev) => (prev ? { ...prev, status: 'transcribing' } : prev))
-    if (session?.recordingSource === 'recorded') {
-      await window.api.invoke('whisper:transcribe-all', sessionId)
-      return
-    }
-    await window.api.invoke('whisper:transcribe', sessionId)
+    await startTranscription(session?.recordingSource === 'recorded')
   }
 
   async function handleTranscribeAll(): Promise<void> {
+    await startTranscription(true)
+  }
+
+  async function startTranscription(allSources: boolean): Promise<void> {
     setError(null)
+    setProgress(0)
     setSession((prev) => (prev ? { ...prev, status: 'transcribing' } : prev))
-    await window.api.invoke('whisper:transcribe-all', sessionId)
+    try {
+      await window.api.invoke(
+        allSources ? 'whisper:transcribe-all' : 'whisper:transcribe',
+        sessionId
+      )
+      await reload()
+    } catch (err) {
+      setSession((prev) => (prev ? { ...prev, status: 'idle' } : prev))
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  async function handleCancelTranscription(): Promise<void> {
+    setCancelling(true)
+    try {
+      await window.api.invoke('whisper:cancel', sessionId)
+      await reload()
+      setProgress(0)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setCancelling(false)
+    }
   }
 
   const sessionName = session?.name ?? session?.audioSources[0]?.path.split('/').pop() ?? 'Session'
@@ -576,12 +597,10 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
             </span>
             <button
               className="text-[11px] text-[#c0a8b5] transition-colors hover:text-red-500"
-              onClick={async () => {
-                await window.api.invoke('whisper:cancel', sessionId)
-                reload()
-              }}
+              onClick={handleCancelTranscription}
+              disabled={cancelling}
             >
-              Cancel
+              {cancelling ? 'Cancelling…' : 'Cancel'}
             </button>
           </div>
           <Progress value={progress} animated size="xs" color="sunset" radius="xl" />

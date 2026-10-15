@@ -56,9 +56,12 @@ async function transcribeOneSource(
   onSegment: (seg: Segment) => void,
   onProgress: (percent: number) => void
 ): Promise<Segment[]> {
+  const controller = controllers.get(sessionId)
+  if (!controller) throw new Error('Transcription is not running')
+  const { signal } = controller
   const isDiarize = model.includes('diarize')
   const responseFormat = responseFormatFor(model)
-  const plan = await planAudioParts(audioPath)
+  const plan = await planAudioParts(audioPath, signal)
   const speakerCache = new Map<string, string>()
   const segments: Segment[] = []
 
@@ -67,8 +70,6 @@ async function transcribeOneSource(
     for (let i = 0; i < plan.parts.length; i++) {
       if (cancelled.has(sessionId)) break
       const part = plan.parts[i]
-      const controller = new AbortController()
-      controllers.set(sessionId, controller)
 
       const resp = await openaiTranscribe(part.path, {
         apiKey,
@@ -77,8 +78,9 @@ async function transcribeOneSource(
         language,
         prompt: isDiarize ? undefined : prevText || undefined,
         chunkingAuto: isDiarize,
-        signal: controller.signal
+        signal
       })
+      signal.throwIfAborted()
 
       let parsed: ParsedSegment[]
       if (isDiarize) parsed = parseDiarizedJson(resp)
@@ -103,7 +105,6 @@ async function transcribeOneSource(
     return segments
   } finally {
     plan.cleanup()
-    controllers.delete(sessionId)
   }
 }
 
@@ -120,8 +121,10 @@ export async function transcribeSession(sessionId: string): Promise<void> {
   if (!primary || !existsSync(primary)) throw new Error('Audio file not found')
 
   cancelled.delete(sessionId)
+  controllers.set(sessionId, new AbortController())
   const sessionFilePath = getSessionPath(sessionId)
   const liveSession: Session = { ...session, status: 'transcribing', segments: [] }
+  let pendingSave = Promise.resolve()
 
   try {
     const key = requireApiKey()
@@ -139,14 +142,16 @@ export async function transcribeSession(sessionId: string): Promise<void> {
         broadcast('whisper:segment', { sessionId, segment: seg })
         if (++sinceFlush >= 10) {
           sinceFlush = 0
-          void writeFile(sessionFilePath, JSON.stringify(liveSession, null, 2), 'utf8').catch(
-            () => {}
-          )
+          const snapshot = JSON.stringify(liveSession, null, 2)
+          pendingSave = pendingSave
+            .then(() => writeFile(sessionFilePath, snapshot, 'utf8'))
+            .catch(() => {})
         }
       },
       (percent) => broadcast('whisper:progress', { sessionId, percent, eta: null })
     )
 
+    await pendingSave
     if (cancelled.has(sessionId)) {
       liveSession.status = 'idle'
       writeFileSync(sessionFilePath, JSON.stringify(liveSession, null, 2), 'utf8')
@@ -158,13 +163,16 @@ export async function transcribeSession(sessionId: string): Promise<void> {
     writeFileSync(sessionFilePath, JSON.stringify(liveSession, null, 2), 'utf8')
     broadcast('whisper:done', { sessionId })
   } catch (err) {
+    await pendingSave
     liveSession.status = 'idle'
     writeFileSync(sessionFilePath, JSON.stringify(liveSession, null, 2), 'utf8')
+    if (cancelled.has(sessionId)) return
     const message = err instanceof Error ? err.message : String(err)
     broadcast('whisper:error', { sessionId, message })
     throw err
   } finally {
     cancelled.delete(sessionId)
+    controllers.delete(sessionId)
   }
 }
 
@@ -173,6 +181,7 @@ export async function transcribeAllSources(sessionId: string): Promise<void> {
   if (!session) throw new Error(`Session not found: ${sessionId}`)
 
   cancelled.delete(sessionId)
+  controllers.set(sessionId, new AbortController())
   const sessionFilePath = getSessionPath(sessionId)
   const allSegments: Segment[] = []
 
@@ -213,15 +222,18 @@ export async function transcribeAllSources(sessionId: string): Promise<void> {
   } catch (err) {
     const updated: Session = { ...session, status: 'idle', segments: allSegments }
     writeFileSync(sessionFilePath, JSON.stringify(updated, null, 2), 'utf8')
+    if (cancelled.has(sessionId)) return
     const message = err instanceof Error ? err.message : String(err)
     broadcast('whisper:error', { sessionId, message })
     throw err
   } finally {
     cancelled.delete(sessionId)
+    controllers.delete(sessionId)
   }
 }
 
 export function cancelTranscription(sessionId: string): void {
+  if (!controllers.has(sessionId)) return
   cancelled.add(sessionId)
   controllers.get(sessionId)?.abort()
 }

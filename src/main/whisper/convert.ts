@@ -5,10 +5,11 @@
 // avoids clipping the last words when the source ends very close to speech.
 
 import { execSync, spawn } from 'child_process'
-import { existsSync } from 'fs'
+import { existsSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { randomUUID } from 'crypto'
+import { spawnCancellable } from '../transcription/process'
 
 const FFMPEG_FALLBACK_PATHS: Record<NodeJS.Platform, string[]> = {
   darwin: ['/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg'],
@@ -99,7 +100,8 @@ export function convertForPlayback(
 // silence tail. Used by whisper (16 kHz) and the T-one engine (8 kHz).
 export function prepareAudioResampled(
   inputPath: string,
-  sampleRate: number
+  sampleRate: number,
+  signal?: AbortSignal
 ): Promise<ConvertResult> {
   const ffmpeg = findFfmpeg()
   if (!ffmpeg) {
@@ -114,22 +116,32 @@ export function prepareAudioResampled(
   const wavPath = join(tmpdir(), `transcribe-${randomUUID()}.wav`)
 
   return new Promise((resolve, reject) => {
-    const proc = spawn(ffmpeg, [
-      '-y',
-      '-i',
-      inputPath,
-      '-af',
-      'apad=pad_dur=1',
-      '-ar',
-      String(sampleRate),
-      '-ac',
-      '1',
-      '-c:a',
-      'pcm_s16le',
-      wavPath
-    ])
+    const proc = spawnCancellable(
+      ffmpeg,
+      [
+        '-y',
+        '-i',
+        inputPath,
+        '-af',
+        'apad=pad_dur=1',
+        '-ar',
+        String(sampleRate),
+        '-ac',
+        '1',
+        '-c:a',
+        'pcm_s16le',
+        wavPath
+      ],
+      signal
+    )
+    proc.stderr.resume()
 
     proc.on('close', (code) => {
+      if (signal?.aborted || code !== 0) rmSync(wavPath, { force: true })
+      if (signal?.aborted) {
+        reject(signal.reason)
+        return
+      }
       if (code === 0) {
         resolve({ audioPath: wavPath, tempFile: true })
       } else {
@@ -141,6 +153,6 @@ export function prepareAudioResampled(
   })
 }
 
-export function prepareAudio(inputPath: string): Promise<ConvertResult> {
-  return prepareAudioResampled(inputPath, 16000)
+export function prepareAudio(inputPath: string, signal?: AbortSignal): Promise<ConvertResult> {
+  return prepareAudioResampled(inputPath, 16000, signal)
 }

@@ -15,6 +15,6 @@ export function registerWhisperHandlers(): void {
   })
 
   ipcMain.handle('whisper:cancel', (_e, sessionId: string) => {
-    cancelTranscription(sessionId)
+    return cancelTranscription(sessionId)
   })
 }
