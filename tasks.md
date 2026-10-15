@@ -73,3 +73,4 @@ Each screen is independent after Phase 0–1 are done.
 - [x] **T-063** Error handling (transcription failed, model not found, file unreadable)
 - [x] **T-064** First-launch detection (skip Screen 0 if model already downloaded)
 - [x] **T-065** Fix cancellation during audio preparation, multi-source transcription, and network requests; recover stale transcribing sessions
+- [x] **T-066** Add a shared proxy setting for external providers, including API key verification

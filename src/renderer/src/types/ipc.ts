@@ -52,6 +52,7 @@ export interface Settings {
   defaultLanguage: string
   storagePath: string
   openaiApiKey?: string
+  providerProxyUrl?: string
 }
 
 export interface ModelInfo {

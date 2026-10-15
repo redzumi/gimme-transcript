@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Button, Select, Group, PasswordInput, Progress } from '@mantine/core'
+import { Button, Select, Group, PasswordInput, Progress, TextInput } from '@mantine/core'
 import type { Settings, EngineInfo, EngineModelInfo } from '../types/ipc'
 
 interface Props {
@@ -47,6 +47,9 @@ export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
   const [keyDrafts, setKeyDrafts] = useState<Record<string, string>>({})
   const [keyStatus, setKeyStatus] = useState<Record<string, { msg: string; ok: boolean }>>({})
   const [selectedEngineId, setSelectedEngineId] = useState<string | null>(null)
+  const [proxyDraft, setProxyDraft] = useState<string | null>(null)
+  const [savingProxy, setSavingProxy] = useState(false)
+  const [proxyStatus, setProxyStatus] = useState<{ msg: string; ok: boolean } | null>(null)
 
   const reload = useCallback(async () => {
     const [s, engineList] = await Promise.all([
@@ -54,6 +57,7 @@ export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
       window.api.invoke('engines:list')
     ])
     setSettings(s)
+    setProxyDraft((prev) => prev ?? s.providerProxyUrl ?? '')
     setEngines(engineList)
     const entries = await Promise.all(
       engineList.map(async (e) => [e.id, await window.api.invoke('engines:models', e.id)] as const)
@@ -133,6 +137,23 @@ export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
       [engineId]: { msg: res.ok ? 'Valid ✓' : (res.message ?? 'Invalid'), ok: res.ok }
     }))
     await reload()
+  }
+
+  async function handleSaveProxy(): Promise<void> {
+    setSavingProxy(true)
+    setProxyStatus(null)
+    try {
+      const updated = await window.api.invoke('settings:update', {
+        providerProxyUrl: proxyDraft ?? ''
+      })
+      setSettings(updated)
+      setProxyDraft(updated.providerProxyUrl ?? '')
+      setProxyStatus({ msg: 'Saved. Applies to new provider requests.', ok: true })
+    } catch (err) {
+      setProxyStatus({ msg: err instanceof Error ? err.message : String(err), ok: false })
+    } finally {
+      setSavingProxy(false)
+    }
   }
 
   if (!settings) return <div className="h-screen" style={{ background: 'var(--app-shell)' }} />
@@ -325,6 +346,50 @@ export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
                         }`}
                       >
                         {keyStatus[selectedEngine.id].msg}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {isCloud && (
+                <div className="mb-6">
+                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#a08a96]">
+                    Proxy for external providers
+                  </p>
+                  <div className="rounded-2xl border border-[#e8d4ca]/60 bg-white/70 p-4 backdrop-blur-sm">
+                    <p className="mb-3 text-[12px] text-[#7a6671]">
+                      Shared by all external providers for transcription and API key verification.
+                    </p>
+                    <Group align="flex-start" gap="sm">
+                      <TextInput
+                        label="Proxy URL"
+                        description="HTTP, HTTPS or SOCKS4/5 without authentication. Leave empty for a direct connection."
+                        placeholder="socks5://127.0.0.1:1080"
+                        flex={1}
+                        value={proxyDraft ?? ''}
+                        disabled={savingProxy}
+                        onChange={(event) => {
+                          setProxyDraft(event.currentTarget.value)
+                          setProxyStatus(null)
+                        }}
+                      />
+                      <Button
+                        className="mt-6"
+                        size="sm"
+                        variant="light"
+                        color="sunset"
+                        loading={savingProxy}
+                        onClick={handleSaveProxy}
+                      >
+                        Save proxy
+                      </Button>
+                    </Group>
+                    {proxyStatus && (
+                      <p
+                        className={`mt-2 text-[12px] ${proxyStatus.ok ? 'text-emerald-600' : 'text-red-500'}`}
+                      >
+                        {proxyStatus.msg}
                       </p>
                     )}
                   </div>

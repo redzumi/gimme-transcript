@@ -96,6 +96,19 @@ npm run build:mac
 npm run screenshots
 ```
 
+## External provider proxy
+
+For cloud transcription, open **Settings → OpenAI → Proxy for external providers**,
+enter a proxy URL and click **Save proxy**. For example:
+
+- `http://127.0.0.1:8080`
+- `socks5://127.0.0.1:1080`
+
+HTTP, HTTPS, SOCKS4 and SOCKS5 proxies without authentication are supported. The
+setting is shared by external providers and applies to transcription and API key
+verification. Leave the URL empty and save to connect directly. Changes apply to
+new requests immediately; local engines and model downloads are unaffected.
+
 ## Whisper Models
 
 The app downloads Whisper models into the app data directory on first use.

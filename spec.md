@@ -280,6 +280,16 @@ Transcript ready, speaker labeling, export.
 
 ---
 
+### External provider proxy
+
+Cloud engine settings include a shared proxy URL for external providers. It is
+stored as `providerProxyUrl` in settings and applies to both transcription and API
+key verification. Supported schemes are HTTP, HTTPS, SOCKS4 and SOCKS5 without
+authentication. An empty URL uses a direct connection. Invalid URLs are rejected
+before saving. Changes apply to new requests without restarting the app or
+interrupting an existing transcription. Local transcription and model downloads
+keep their existing network behavior.
+
 ## Architecture
 
 ```

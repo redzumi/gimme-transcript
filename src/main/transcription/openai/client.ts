@@ -3,7 +3,7 @@
 
 import { readFileSync } from 'fs'
 import { basename } from 'path'
-import https from 'https'
+import { providerFetch } from '../network'
 
 export type OpenAIResponseFormat = 'verbose_json' | 'diarized_json' | 'json' | 'text'
 
@@ -39,7 +39,7 @@ export async function openaiTranscribe(
   if (opts.prompt) form.append('prompt', opts.prompt)
   if (opts.chunkingAuto) form.append('chunking_strategy', 'auto')
 
-  const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+  const res = await providerFetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',
     headers: { Authorization: `Bearer ${opts.apiKey}` },
     body: form,
@@ -52,23 +52,25 @@ export async function openaiTranscribe(
 }
 
 // Validate an API key against GET /v1/models.
-export function validateKey(key: string): Promise<{ ok: boolean; message?: string }> {
-  return new Promise((resolve) => {
-    const req = https.request(
-      'https://api.openai.com/v1/models',
-      { method: 'GET', headers: { Authorization: `Bearer ${key}` }, timeout: 10000 },
-      (res) => {
-        res.resume()
-        if (res.statusCode === 200) resolve({ ok: true })
-        else if (res.statusCode === 401) resolve({ ok: false, message: 'Invalid API key' })
-        else resolve({ ok: false, message: `HTTP ${res.statusCode}` })
-      }
-    )
-    req.on('timeout', () => {
-      req.destroy()
-      resolve({ ok: false, message: 'Request timed out' })
+export async function validateKey(key: string): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const res = await providerFetch('https://api.openai.com/v1/models', {
+      headers: { Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(10000)
     })
-    req.on('error', (err) => resolve({ ok: false, message: err.message }))
-    req.end()
-  })
+    await res.body?.cancel()
+    if (res.status === 200) return { ok: true }
+    if (res.status === 401) return { ok: false, message: 'Invalid API key' }
+    return { ok: false, message: `HTTP ${res.status}` }
+  } catch (err) {
+    return {
+      ok: false,
+      message:
+        err instanceof Error && err.name === 'TimeoutError'
+          ? 'Request timed out'
+          : err instanceof Error
+            ? err.message
+            : String(err)
+    }
+  }
 }

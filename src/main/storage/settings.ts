@@ -2,13 +2,15 @@ import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { app } from 'electron'
 import type { Settings } from '../../renderer/src/types/ipc'
 import { getSettingsPath } from './paths'
+import { normalizeProviderProxy } from '../transcription/proxy-config'
 
 function defaults(): Settings {
   return {
     defaultEngine: 'whisper',
     defaultModel: 'medium',
     defaultLanguage: 'auto',
-    storagePath: app.getPath('userData')
+    storagePath: app.getPath('userData'),
+    providerProxyUrl: ''
   }
 }
 
@@ -25,6 +27,9 @@ export function getSettings(): Settings {
 export function updateSettings(data: Partial<Settings>): Settings {
   const current = getSettings()
   const updated: Settings = { ...current, ...data }
+  if (data.providerProxyUrl !== undefined) {
+    updated.providerProxyUrl = normalizeProviderProxy(data.providerProxyUrl)
+  }
   writeFileSync(getSettingsPath(), JSON.stringify(updated, null, 2), 'utf8')
   return updated
 }
