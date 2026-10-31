@@ -170,6 +170,14 @@ export const ENGINE_REGISTRY: EngineDef[] = [
     binaries: [],
     models: [
       {
+        id: 'gpt-transcribe',
+        name: 'GPT Transcribe',
+        sizeBytes: 0,
+        url: 'https://api.openai.com/v1/audio/transcriptions',
+        pricePerMinute: 0.0045,
+        latest: true
+      },
+      {
         id: 'whisper-1',
         name: 'Whisper 1',
         sizeBytes: 0,

@@ -85,7 +85,7 @@ async function transcribeOneSource(
       let parsed: ParsedSegment[]
       if (isDiarize) parsed = parseDiarizedJson(resp)
       else if (responseFormat === 'verbose_json') parsed = parseVerboseJson(resp)
-      else parsed = parseTextResponse(resp, plan.durationSec)
+      else parsed = parseTextResponse(resp, part.durationSec)
 
       for (const ps of parsed) {
         if (!ps.text) continue

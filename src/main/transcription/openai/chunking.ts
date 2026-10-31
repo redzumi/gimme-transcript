@@ -1,6 +1,8 @@
-// Prepare audio for OpenAI's 25 MB upload limit: compress to a small mono MP3,
-// and if still too large, split into time segments. Returns parts with their
-// offset (seconds) for timestamp correction, plus a cleanup() for temp files.
+// Prepare audio for OpenAI's upload limits: 25 MB per file and a per-request
+// duration cap (gpt-4o-* models reject audio longer than ~1400 s). Compress to
+// a small mono MP3 and, if still too large or too long, split into time
+// segments. Returns parts with their offset and duration (seconds) for
+// timestamp correction, plus a cleanup() for temp files.
 
 import { statSync, readdirSync, unlinkSync, mkdtempSync, rmSync } from 'fs'
 import { join } from 'path'
@@ -12,11 +14,16 @@ import { spawnCancellable } from '../process'
 const MAX_BYTES = 24 * 1024 * 1024 // 24 MB safety margin under OpenAI's 25 MB
 const MP3_BITRATE_KBPS = 64
 // Seconds of 64 kbps mono MP3 that fit under MAX_BYTES (~50 min).
-const SEGMENT_SEC = Math.floor((MAX_BYTES * 8) / (MP3_BITRATE_KBPS * 1000))
+const SIZE_SEGMENT_SEC = Math.floor((MAX_BYTES * 8) / (MP3_BITRATE_KBPS * 1000))
+// Per-request duration cap with a margin under the 1400 s model limit. Smaller
+// uploads also make slow connections less likely to hit network timeouts.
+export const MAX_PART_SEC = 1200
+const SEGMENT_SEC = Math.min(SIZE_SEGMENT_SEC, MAX_PART_SEC)
 
 export interface AudioPart {
   path: string
   offsetSec: number
+  durationSec: number
 }
 
 export interface AudioPlan {
@@ -101,8 +108,10 @@ export async function planAudioParts(inputPath: string, signal?: AbortSignal): P
     if (dir) rmSync(dir, { recursive: true, force: true })
   }
 
-  if (statSync(inputPath).size <= MAX_BYTES) {
-    return { parts: [{ path: inputPath, offsetSec: 0 }], durationSec, cleanup }
+  // Unknown duration (0) can't be split reliably; rely on the size check only.
+  const fitsDuration = durationSec <= MAX_PART_SEC
+  if (fitsDuration && statSync(inputPath).size <= MAX_BYTES) {
+    return { parts: [{ path: inputPath, offsetSec: 0, durationSec }], durationSec, cleanup }
   }
 
   // Compress to a small mono MP3 first.
@@ -110,11 +119,11 @@ export async function planAudioParts(inputPath: string, signal?: AbortSignal): P
   temps.push(mp3)
   try {
     await compressToMp3(inputPath, mp3, signal)
-    if (statSync(mp3).size <= MAX_BYTES) {
-      return { parts: [{ path: mp3, offsetSec: 0 }], durationSec, cleanup }
+    if (fitsDuration && statSync(mp3).size <= MAX_BYTES) {
+      return { parts: [{ path: mp3, offsetSec: 0, durationSec }], durationSec, cleanup }
     }
 
-    // Still too big: split into time segments.
+    // Still too big or too long: split into time segments.
     const partsDir = mkdtempSync(join(tmpdir(), 'openai-parts-'))
     dir = partsDir
     await run(
@@ -135,10 +144,14 @@ export async function planAudioParts(inputPath: string, signal?: AbortSignal): P
     const files = readdirSync(dir)
       .filter((f) => f.endsWith('.mp3'))
       .sort()
-    const parts: AudioPart[] = files.map((f, i) => ({
-      path: join(partsDir, f),
-      offsetSec: i * SEGMENT_SEC
-    }))
+    const parts: AudioPart[] = files.map((f, i) => {
+      const offsetSec = i * SEGMENT_SEC
+      return {
+        path: join(partsDir, f),
+        offsetSec,
+        durationSec: Math.max(0, Math.min(SEGMENT_SEC, durationSec - offsetSec))
+      }
+    })
     return {
       parts,
       durationSec,
