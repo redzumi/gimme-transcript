@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { Text, Button, Group, Progress, Select, Modal, Checkbox } from '@mantine/core'
 import type { Session, Segment, Speaker, EngineInfo, EngineModelInfo } from '../types/ipc'
 import { SPEAKER_PALETTE } from '../lib/speakerColors'
+import { formatPricePerMinute } from '../lib/price'
 
 interface Props {
   sessionId: string
@@ -374,7 +375,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
   const currentEngine = session.engine
   const engineInfo = engines.find((e) => e.id === currentEngine)
   const engineLangs = engineInfo?.languages ?? []
-  // Cloud engines (OpenAI) need no local model file; locals (whisper, T-one) do.
+  // Cloud engines (OpenAI, ElevenLabs) need no local model file; locals (whisper, T-one) do.
   const isCloud = !!engineInfo?.features.requiresNetwork
   const selectableModels = isCloud ? engineModels : engineModels.filter((m) => m.downloaded)
   const selectedModel = selectableModels.find((m) => m.id === session.model) ?? selectableModels[0]
@@ -388,7 +389,7 @@ export default function SessionScreen({ sessionId, onBack }: Props): React.JSX.E
         : ''
   const costHint =
     isCloud && selectedModel?.pricePerMinute
-      ? `~$${selectedModel.pricePerMinute.toFixed(3)}/min`
+      ? `~${formatPricePerMinute(selectedModel.pricePerMinute)}`
       : ''
 
   return (

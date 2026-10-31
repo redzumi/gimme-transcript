@@ -4,6 +4,7 @@
 import { readFileSync } from 'fs'
 import { basename } from 'path'
 import { providerFetch } from '../network'
+import { fetchWithRetry } from '../retry'
 
 export type OpenAIResponseFormat = 'verbose_json' | 'diarized_json' | 'json' | 'text'
 
@@ -26,26 +27,33 @@ function mapError(status: number, body: string): Error {
 }
 
 // Returns parsed JSON (verbose_json / diarized_json / json) or { text } for text.
+// Transient failures (network errors, 429, 5xx) are retried with backoff.
 export async function openaiTranscribe(
   audioPath: string,
   opts: OpenAITranscribeOptions
 ): Promise<unknown> {
   const buf = readFileSync(audioPath)
-  const form = new FormData()
-  form.append('file', new Blob([buf]), basename(audioPath))
-  form.append('model', opts.model)
-  form.append('response_format', opts.responseFormat)
-  if (opts.language && opts.language !== 'auto') form.append('language', opts.language)
-  if (opts.prompt) form.append('prompt', opts.prompt)
-  if (opts.chunkingAuto) form.append('chunking_strategy', 'auto')
+  const buildForm = (): FormData => {
+    const form = new FormData()
+    form.append('file', new Blob([buf]), basename(audioPath))
+    form.append('model', opts.model)
+    form.append('response_format', opts.responseFormat)
+    if (opts.language && opts.language !== 'auto') form.append('language', opts.language)
+    if (opts.prompt) form.append('prompt', opts.prompt)
+    if (opts.chunkingAuto) form.append('chunking_strategy', 'auto')
+    return form
+  }
 
-  const res = await providerFetch('https://api.openai.com/v1/audio/transcriptions', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${opts.apiKey}` },
-    body: form,
-    signal: opts.signal
-  })
-
+  const res = await fetchWithRetry(
+    () =>
+      providerFetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${opts.apiKey}` },
+        body: buildForm(),
+        signal: opts.signal
+      }),
+    opts.signal
+  )
   if (!res.ok) throw mapError(res.status, await res.text().catch(() => ''))
   if (opts.responseFormat === 'text') return { text: await res.text() }
   return res.json()

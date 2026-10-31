@@ -1,6 +1,6 @@
 // Engine-agnostic model manager: per-engine model directories, download/delete,
 // and readiness status. Local engines (whisper ggml, t-one onnx) download files;
-// cloud engines (openai) have nothing to download — readiness depends on an API
+// cloud engines (openai, elevenlabs) have nothing to download — readiness depends on an API
 // key (see engineStatus).
 
 import { existsSync, createWriteStream, unlinkSync, mkdirSync } from 'fs'
@@ -59,6 +59,7 @@ export function getEngineModels(engineId: string): EngineModelInfo[] {
 
 function apiKeyFor(engineId: string): string | undefined {
   if (engineId === 'openai') return getSettings().openaiApiKey
+  if (engineId === 'elevenlabs') return getSettings().elevenlabsApiKey
   return undefined
 }
 

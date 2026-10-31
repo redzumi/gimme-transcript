@@ -39,7 +39,7 @@ import { transcribeSession, transcribeAllSources, cancelTranscription } from './
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.plan.mockResolvedValue({
-    parts: [{ path: '/audio.wav', offsetSec: 0 }],
+    parts: [{ path: '/audio.wav', offsetSec: 0, durationSec: 10 }],
     durationSec: 10,
     cleanup: mocks.cleanup
   })

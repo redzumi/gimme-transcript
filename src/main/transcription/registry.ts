@@ -170,6 +170,14 @@ export const ENGINE_REGISTRY: EngineDef[] = [
     binaries: [],
     models: [
       {
+        id: 'gpt-transcribe',
+        name: 'GPT Transcribe',
+        sizeBytes: 0,
+        url: 'https://api.openai.com/v1/audio/transcriptions',
+        pricePerMinute: 0.0045,
+        latest: true
+      },
+      {
         id: 'whisper-1',
         name: 'Whisper 1',
         sizeBytes: 0,
@@ -278,56 +286,42 @@ export const ENGINE_REGISTRY: EngineDef[] = [
     }
   },
   {
-    id: 'cohere',
-    name: 'Cohere Transcribe',
-    description: 'Local, free. Best-in-class accuracy for 14 languages. 2B Conformer model.',
+    id: 'elevenlabs',
+    name: 'ElevenLabs',
+    description:
+      'Cloud API (Scribe v2). 90+ languages, word-level timestamps, speaker diarization across recordings up to 10 hours.',
     platforms: [
-      { platform: 'darwin', arch: 'arm64', note: 'Apple Silicon (M1+)', minOsVersion: 23 }
+      { platform: 'darwin', arch: 'arm64' },
+      { platform: 'darwin', arch: 'x64' },
+      { platform: 'linux', arch: 'x64' }
     ],
-    minRamMB: 6000,
-    binaries: [
-      {
-        platform: 'darwin',
-        arch: 'arm64',
-        url: 'https://github.com/second-state/cohere_transcribe_rs/releases/download/v0.1.1/transcribe-macos-aarch64.zip',
-        sizeBytes: 0
-      }
-    ],
+    binaries: [],
     models: [
       {
-        id: 'cohere-transcribe-03-2026',
-        name: 'Cohere Transcribe 2B',
-        sizeBytes: 4 * 1024 * 1024 * 1024,
-        url: 'CohereLabs/cohere-transcribe-03-2026',
-        gated: true,
-        isDirectory: true,
-        version: '03-2026',
+        id: 'scribe_v2',
+        name: 'Scribe v2',
+        sizeBytes: 0,
+        url: 'https://api.elevenlabs.io/v1/speech-to-text',
+        pricePerMinute: 0.0037,
+        latest: true
+      },
+      {
+        id: 'scribe_v2-diarize',
+        name: 'Scribe v2 + Diarize',
+        sizeBytes: 0,
+        url: 'https://api.elevenlabs.io/v1/speech-to-text',
+        pricePerMinute: 0.0037,
         latest: true
       }
     ],
-    languages: [
-      { code: 'en', name: 'English' },
-      { code: 'fr', name: 'French' },
-      { code: 'de', name: 'German' },
-      { code: 'es', name: 'Spanish' },
-      { code: 'it', name: 'Italian' },
-      { code: 'pt', name: 'Portuguese' },
-      { code: 'nl', name: 'Dutch' },
-      { code: 'pl', name: 'Polish' },
-      { code: 'el', name: 'Greek' },
-      { code: 'ar', name: 'Arabic' },
-      { code: 'ja', name: 'Japanese' },
-      { code: 'zh', name: 'Chinese' },
-      { code: 'vi', name: 'Vietnamese' },
-      { code: 'ko', name: 'Korean' }
-    ],
+    languages: WHISPER_LANGUAGES,
     features: {
-      timestamps: false,
-      autoLanguage: false,
+      timestamps: true,
+      autoLanguage: true,
       streamingProgress: false,
-      requiresApiKey: false,
-      requiresNetwork: false,
-      diarization: false
+      requiresApiKey: true,
+      requiresNetwork: true,
+      diarization: true
     }
   },
   {

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Button, Select, Group, PasswordInput, Progress } from '@mantine/core'
 import type { Settings, EngineInfo, EngineModelInfo } from '../types/ipc'
+import { formatPricePerMinute } from '../lib/price'
 
 interface Props {
   onBack: () => void
@@ -37,6 +38,17 @@ const STATUS_LABEL: Record<EngineInfo['status'], string> = {
   unavailable: 'Unavailable'
 }
 
+// Settings field that stores each cloud engine's API key.
+const API_KEY_FIELD: Record<string, 'openaiApiKey' | 'elevenlabsApiKey'> = {
+  openai: 'openaiApiKey',
+  elevenlabs: 'elevenlabsApiKey'
+}
+
+const API_KEY_PLACEHOLDER: Record<string, string> = {
+  openai: 'sk-…',
+  elevenlabs: 'sk_…'
+}
+
 const dlKey = (engineId: string, modelId: string): string => `${engineId}:${modelId}`
 
 export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
@@ -63,7 +75,11 @@ export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
       engineList.map(async (e) => [e.id, await window.api.invoke('engines:models', e.id)] as const)
     )
     setModelsByEngine(Object.fromEntries(entries))
-    setKeyDrafts((prev) => ({ openai: s.openaiApiKey ?? prev.openai ?? '' }))
+    setKeyDrafts((prev) =>
+      Object.fromEntries(
+        Object.entries(API_KEY_FIELD).map(([id, field]) => [id, s[field] ?? prev[id] ?? ''])
+      )
+    )
     setSelectedEngineId((prev) => prev ?? engineList[0]?.id ?? null)
   }, [])
 
@@ -130,7 +146,8 @@ export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
   async function handleValidateKey(engineId: string): Promise<void> {
     setKeyStatus((p) => ({ ...p, [engineId]: { msg: 'Validating…', ok: true } }))
     const key = keyDrafts[engineId] ?? ''
-    if (engineId === 'openai') await updateSettings({ openaiApiKey: key })
+    const field = API_KEY_FIELD[engineId]
+    if (field) await updateSettings({ [field]: key })
     const res = await window.api.invoke('engines:validate-key', engineId, key)
     setKeyStatus((p) => ({
       ...p,
@@ -323,7 +340,7 @@ export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
                       <PasswordInput
                         label="API key"
                         flex={1}
-                        placeholder="sk-…"
+                        placeholder={API_KEY_PLACEHOLDER[selectedEngine.id] ?? ''}
                         value={keyDrafts[selectedEngine.id] ?? ''}
                         onChange={(e) => {
                           const value = e.currentTarget.value
@@ -424,7 +441,9 @@ export default function SettingsScreen({ onBack }: Props): React.JSX.Element {
                                 <p className="text-[11px] text-[#a08a96]">
                                   {[
                                     m.sizeBytes > 0 ? formatBytes(m.sizeBytes) : null,
-                                    m.pricePerMinute ? `$${m.pricePerMinute.toFixed(3)}/min` : null,
+                                    m.pricePerMinute
+                                      ? formatPricePerMinute(m.pricePerMinute)
+                                      : null,
                                     m.downloaded && !isCloud ? 'Downloaded' : null
                                   ]
                                     .filter(Boolean)

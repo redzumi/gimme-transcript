@@ -27,6 +27,38 @@ it('uses the provider transport for multipart transcription and preserves cancel
   expect(init.body.get('file').name).toBe('audio.wav')
 })
 
+it('retries transient network errors and 5xx responses', async () => {
+  vi.useFakeTimers()
+  try {
+    mocks.fetch
+      .mockRejectedValueOnce(new Error('net::ERR_TIMED_OUT'))
+      .mockResolvedValueOnce(new Response('oops', { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ text: 'ok' })))
+    const running = openaiTranscribe('/audio.wav', {
+      apiKey: 'test',
+      model: 'gpt-transcribe',
+      responseFormat: 'json'
+    })
+    await vi.runAllTimersAsync()
+    await expect(running).resolves.toEqual({ text: 'ok' })
+    expect(mocks.fetch).toHaveBeenCalledTimes(3)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('does not retry client errors', async () => {
+  mocks.fetch.mockResolvedValue(new Response('bad', { status: 400 }))
+  await expect(
+    openaiTranscribe('/audio.wav', {
+      apiKey: 'test',
+      model: 'gpt-transcribe',
+      responseFormat: 'json'
+    })
+  ).rejects.toThrow('OpenAI error 400')
+  expect(mocks.fetch).toHaveBeenCalledOnce()
+})
+
 it.each([
   [200, true],
   [401, false],
