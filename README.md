@@ -98,7 +98,8 @@ npm run screenshots
 
 ## External provider proxy
 
-For cloud transcription, open **Settings → OpenAI → Proxy for external providers**,
+For cloud transcription (OpenAI, ElevenLabs), open **Settings → OpenAI** or
+**Settings → ElevenLabs → Proxy for external providers**,
 enter a proxy URL and click **Save proxy**. For example:
 
 - `http://127.0.0.1:8080`

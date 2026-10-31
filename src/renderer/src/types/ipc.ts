@@ -3,7 +3,7 @@
 import type { EngineInfo, EngineModelInfo } from './engines'
 export type { EngineInfo, EngineModelInfo }
 
-export type TranscriptionEngine = 'whisper' | 'openai' | 't-one'
+export type TranscriptionEngine = 'whisper' | 'openai' | 'elevenlabs' | 't-one'
 
 export type WhisperModel = 'tiny' | 'base' | 'small' | 'medium' | 'large'
 
@@ -52,6 +52,7 @@ export interface Settings {
   defaultLanguage: string
   storagePath: string
   openaiApiKey?: string
+  elevenlabsApiKey?: string
   providerProxyUrl?: string
 }
 

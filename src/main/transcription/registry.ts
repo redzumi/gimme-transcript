@@ -286,6 +286,45 @@ export const ENGINE_REGISTRY: EngineDef[] = [
     }
   },
   {
+    id: 'elevenlabs',
+    name: 'ElevenLabs',
+    description:
+      'Cloud API (Scribe v2). 90+ languages, word-level timestamps, speaker diarization across recordings up to 10 hours.',
+    platforms: [
+      { platform: 'darwin', arch: 'arm64' },
+      { platform: 'darwin', arch: 'x64' },
+      { platform: 'linux', arch: 'x64' }
+    ],
+    binaries: [],
+    models: [
+      {
+        id: 'scribe_v2',
+        name: 'Scribe v2',
+        sizeBytes: 0,
+        url: 'https://api.elevenlabs.io/v1/speech-to-text',
+        pricePerMinute: 0.0037,
+        latest: true
+      },
+      {
+        id: 'scribe_v2-diarize',
+        name: 'Scribe v2 + Diarize',
+        sizeBytes: 0,
+        url: 'https://api.elevenlabs.io/v1/speech-to-text',
+        pricePerMinute: 0.0037,
+        latest: true
+      }
+    ],
+    languages: WHISPER_LANGUAGES,
+    features: {
+      timestamps: true,
+      autoLanguage: true,
+      streamingProgress: false,
+      requiresApiKey: true,
+      requiresNetwork: true,
+      diarization: true
+    }
+  },
+  {
     id: 't-one',
     name: 'T-one (Russian)',
     description:

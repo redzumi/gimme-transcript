@@ -8,6 +8,7 @@ import { getEngineDef } from './types'
 import * as whisper from '../whisper'
 import * as tone from '../t-one'
 import * as openai from './openai'
+import * as elevenlabs from './elevenlabs'
 
 function defOf(id: string): Engine['definition'] {
   const def = getEngineDef(ENGINE_REGISTRY, id)
@@ -34,6 +35,13 @@ export const ENGINES: Record<string, Engine> = {
     transcribeAllSources: openai.transcribeAllSources,
     cancelTranscription: openai.cancelTranscription,
     validateKey: openai.validateKey
+  },
+  elevenlabs: {
+    definition: defOf('elevenlabs'),
+    transcribeSession: elevenlabs.transcribeSession,
+    transcribeAllSources: elevenlabs.transcribeAllSources,
+    cancelTranscription: elevenlabs.cancelTranscription,
+    validateKey: elevenlabs.validateKey
   }
 }
 

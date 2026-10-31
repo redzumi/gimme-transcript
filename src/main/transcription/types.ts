@@ -1,6 +1,6 @@
 import os from 'os'
 
-export type TranscriptionEngine = 'whisper' | 'openai' | 't-one'
+export type TranscriptionEngine = 'whisper' | 'openai' | 'elevenlabs' | 't-one'
 
 export type Platform = ReturnType<typeof os.platform>
 export type Arch = ReturnType<typeof os.arch>

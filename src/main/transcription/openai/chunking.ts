@@ -8,11 +8,9 @@ import { statSync, readdirSync, unlinkSync, mkdtempSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { randomUUID } from 'crypto'
-import { findFfmpeg } from '../../whisper/convert'
-import { spawnCancellable } from '../process'
+import { compressToMp3, runFfmpeg, getDurationSec, MP3_BITRATE_KBPS } from '../ffmpeg'
 
 const MAX_BYTES = 24 * 1024 * 1024 // 24 MB safety margin under OpenAI's 25 MB
-const MP3_BITRATE_KBPS = 64
 // Seconds of 64 kbps mono MP3 that fit under MAX_BYTES (~50 min).
 const SIZE_SEGMENT_SEC = Math.floor((MAX_BYTES * 8) / (MP3_BITRATE_KBPS * 1000))
 // Per-request duration cap with a margin under the 1400 s model limit. Smaller
@@ -30,67 +28,6 @@ export interface AudioPlan {
   parts: AudioPart[]
   durationSec: number
   cleanup: () => void
-}
-
-function ffmpeg(): string {
-  const bin = findFfmpeg()
-  if (!bin) throw new Error('ffmpeg not found. Install it to use OpenAI transcription.')
-  return bin
-}
-
-function run(args: string[], signal?: AbortSignal): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const proc = spawnCancellable(ffmpeg(), args, signal)
-    let stderr = ''
-    proc.stderr.on('data', (d: Buffer) => (stderr += d.toString()))
-    proc.on('close', (code) => {
-      if (signal?.aborted) reject(signal.reason)
-      else if (code === 0) resolve(stderr)
-      else reject(new Error(`ffmpeg ${code}`))
-    })
-    proc.on('error', reject)
-  })
-}
-
-export async function getDurationSec(inputPath: string, signal?: AbortSignal): Promise<number> {
-  // ffmpeg exits with a non-zero code when probing without an output file.
-  return new Promise((resolve, reject) => {
-    const proc = spawnCancellable(ffmpeg(), ['-i', inputPath], signal)
-    let stderr = ''
-    proc.stderr.on('data', (d: Buffer) => (stderr += d.toString()))
-    proc.on('close', () => {
-      if (signal?.aborted) {
-        reject(signal.reason)
-        return
-      }
-      const m = stderr.match(/Duration:\s*(\d+):(\d+):(\d+\.\d+)/)
-      resolve(m ? +m[1] * 3600 + +m[2] * 60 + parseFloat(m[3]) : 0)
-    })
-    proc.on('error', () => resolve(0))
-  })
-}
-
-async function compressToMp3(
-  inputPath: string,
-  outPath: string,
-  signal?: AbortSignal
-): Promise<void> {
-  await run(
-    [
-      '-y',
-      '-i',
-      inputPath,
-      '-vn',
-      '-ac',
-      '1',
-      '-ar',
-      '16000',
-      '-b:a',
-      `${MP3_BITRATE_KBPS}k`,
-      outPath
-    ],
-    signal
-  )
 }
 
 export async function planAudioParts(inputPath: string, signal?: AbortSignal): Promise<AudioPlan> {
@@ -126,7 +63,7 @@ export async function planAudioParts(inputPath: string, signal?: AbortSignal): P
     // Still too big or too long: split into time segments.
     const partsDir = mkdtempSync(join(tmpdir(), 'openai-parts-'))
     dir = partsDir
-    await run(
+    await runFfmpeg(
       [
         '-y',
         '-i',
