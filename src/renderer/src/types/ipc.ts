@@ -3,7 +3,7 @@
 import type { EngineInfo, EngineModelInfo } from './engines'
 export type { EngineInfo, EngineModelInfo }
 
-export type TranscriptionEngine = 'whisper' | 'openai' | 'cohere' | 't-one'
+export type TranscriptionEngine = 'whisper' | 'openai' | 't-one'
 
 export type WhisperModel = 'tiny' | 'base' | 'small' | 'medium' | 'large'
 

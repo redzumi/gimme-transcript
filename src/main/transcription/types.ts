@@ -1,6 +1,6 @@
 import os from 'os'
 
-export type TranscriptionEngine = 'whisper' | 'openai' | 'cohere' | 't-one'
+export type TranscriptionEngine = 'whisper' | 'openai' | 't-one'
 
 export type Platform = ReturnType<typeof os.platform>
 export type Arch = ReturnType<typeof os.arch>
@@ -25,8 +25,6 @@ export interface ModelDef {
   name: string
   sizeBytes: number
   url: string
-  gated?: boolean
-  isDirectory?: boolean
   version?: string
   latest?: boolean
   pricePerMinute?: number
@@ -51,7 +49,6 @@ export interface EngineDef {
   name: string
   description: string
   platforms: PlatformSupport[]
-  minRamMB?: number
   binaries: BinaryDef[]
   models: ModelDef[]
   languages: LanguageDef[]

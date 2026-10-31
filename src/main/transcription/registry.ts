@@ -286,59 +286,6 @@ export const ENGINE_REGISTRY: EngineDef[] = [
     }
   },
   {
-    id: 'cohere',
-    name: 'Cohere Transcribe',
-    description: 'Local, free. Best-in-class accuracy for 14 languages. 2B Conformer model.',
-    platforms: [
-      { platform: 'darwin', arch: 'arm64', note: 'Apple Silicon (M1+)', minOsVersion: 23 }
-    ],
-    minRamMB: 6000,
-    binaries: [
-      {
-        platform: 'darwin',
-        arch: 'arm64',
-        url: 'https://github.com/second-state/cohere_transcribe_rs/releases/download/v0.1.1/transcribe-macos-aarch64.zip',
-        sizeBytes: 0
-      }
-    ],
-    models: [
-      {
-        id: 'cohere-transcribe-03-2026',
-        name: 'Cohere Transcribe 2B',
-        sizeBytes: 4 * 1024 * 1024 * 1024,
-        url: 'CohereLabs/cohere-transcribe-03-2026',
-        gated: true,
-        isDirectory: true,
-        version: '03-2026',
-        latest: true
-      }
-    ],
-    languages: [
-      { code: 'en', name: 'English' },
-      { code: 'fr', name: 'French' },
-      { code: 'de', name: 'German' },
-      { code: 'es', name: 'Spanish' },
-      { code: 'it', name: 'Italian' },
-      { code: 'pt', name: 'Portuguese' },
-      { code: 'nl', name: 'Dutch' },
-      { code: 'pl', name: 'Polish' },
-      { code: 'el', name: 'Greek' },
-      { code: 'ar', name: 'Arabic' },
-      { code: 'ja', name: 'Japanese' },
-      { code: 'zh', name: 'Chinese' },
-      { code: 'vi', name: 'Vietnamese' },
-      { code: 'ko', name: 'Korean' }
-    ],
-    features: {
-      timestamps: false,
-      autoLanguage: false,
-      streamingProgress: false,
-      requiresApiKey: false,
-      requiresNetwork: false,
-      diarization: false
-    }
-  },
-  {
     id: 't-one',
     name: 'T-one (Russian)',
     description:
